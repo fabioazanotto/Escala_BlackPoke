@@ -45,3 +45,20 @@ export const FUNCOES_PADRAO = [
   "Entregador",
   "Gerência",
 ];
+
+// ---- Sistema de escalas multiunidade (veja supabase/escala/01_fundacao.sql) ----
+
+export type Unidade = {
+  id: string;
+  nome: string;
+  ativa: boolean;
+};
+
+export type PerfilAcesso = "rh" | "gerencia";
+
+export type Perfil = {
+  id: string;
+  nome: string;
+  perfil: PerfilAcesso;
+  ativo: boolean;
+};

@@ -5,9 +5,11 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { identidade } from "@/config/identidade";
 import { menu } from "@/config/menu";
+import { useSessao } from "@/components/Sessao";
 
 export function Cabecalho() {
   const caminho = usePathname();
+  const { perfil, sair } = useSessao();
   return (
     <header
       className="sticky top-0 z-10 text-white shadow"
@@ -24,6 +26,13 @@ export function Cabecalho() {
           />
         ) : null}
         <span className="text-lg font-bold">{identidade.nome}</span>
+        <span className="ml-auto text-sm">{perfil.nome}</span>
+        <button
+          onClick={sair}
+          className="rounded-lg bg-white/20 px-3 py-2 text-sm font-semibold active:scale-[0.98]"
+        >
+          Sair
+        </button>
       </div>
       <nav className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-2 pb-2">
         {menu.map((item) => {

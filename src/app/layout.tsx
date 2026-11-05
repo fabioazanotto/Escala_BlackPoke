@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { identidade } from "@/config/identidade";
 import { Cabecalho } from "@/components/Cabecalho";
+import { Sessao } from "@/components/Sessao";
 
 export const metadata: Metadata = {
   title: `Escala · ${identidade.nome}`,
@@ -18,8 +19,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className="h-full antialiased" style={estilo}>
       <body className="flex min-h-full flex-col">
-        <Cabecalho />
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">{children}</main>
+        <Sessao>
+          <Cabecalho />
+          <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">{children}</main>
+        </Sessao>
         <footer className="px-4 py-6 text-center text-xs text-neutral-500">
           {identidade.nome} · sistema de escala
         </footer>

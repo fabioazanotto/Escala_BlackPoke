@@ -29,7 +29,7 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
 7. Toda integração externa fica em `src/lib/integracoes/`, um arquivo por serviço, devolvendo
    sempre o formato interno do sistema (veja `src/lib/tipos.ts`). Trocar de fornecedor deve
    mexer só nesse arquivo.
-8. Cada tela nova entra no menu (`src/config/menu.ts`) e funciona sem login (o login é um passo futuro).
+8. Cada tela nova entra no menu (`src/config/menu.ts`) e exige login (e-mail e senha, perfis RH e gerência; veja `src/components/Sessao.tsx`).
 9. Mantenha o que já funciona. Mudanças pequenas e verificáveis; rode `npm run build` antes do commit.
 10. Ao terminar, faça commit com mensagem curta em português e push direto para a branch `main`
     (`git push origin HEAD:main`). Não abra pull request: a Vercel publica o que está na `main`.
