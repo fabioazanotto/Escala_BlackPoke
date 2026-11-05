@@ -71,3 +71,23 @@ export function horaParaMinutos(hora: string): number {
   const [h, m] = hora.split(":").map(Number);
   return h * 60 + m;
 }
+
+/** "2026-11-20" -> "20/11/2026" */
+export function dataBR(iso: string): string {
+  const [a, m, d] = iso.split("-");
+  return `${d}/${m}/${a}`;
+}
+
+/** Duração em minutos entre dois horários; se o fim é menor ou igual ao início, passa da meia-noite. */
+export function duracaoMinutos(inicio: string, fim: string): number {
+  const i = horaParaMinutos(inicio);
+  const f = horaParaMinutos(fim);
+  return f > i ? f - i : f + 24 * 60 - i;
+}
+
+/** 500 -> "8h20" */
+export function formatarMinutos(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
+}

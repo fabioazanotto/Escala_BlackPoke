@@ -2,6 +2,10 @@
 export const menu: { rotulo: string; href: string }[] = [
   { rotulo: "Painel", href: "/" },
   { rotulo: "Colaboradores", href: "/colaboradores" },
+  { rotulo: "Ausências", href: "/ausencias" },
+  { rotulo: "Horários", href: "/horarios" },
+  { rotulo: "Cobertura", href: "/cobertura" },
+  { rotulo: "Regras", href: "/regras" },
   { rotulo: "Funções", href: "/funcoes" },
   { rotulo: "Unidades", href: "/unidades" },
 ];

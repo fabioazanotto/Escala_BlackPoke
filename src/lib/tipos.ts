@@ -87,3 +87,61 @@ export type Colaborador = {
   data_desligamento: string | null;
   ativo: boolean;
 };
+
+export type Jornada = {
+  id: string;
+  unidade_id: string;
+  turno: Turno2;
+  hora_inicio: string;
+  hora_fim: string; // se <= hora_inicio, termina no dia seguinte
+  intervalo_minutos: number;
+};
+
+export type Funcionamento = {
+  id: string;
+  unidade_id: string;
+  nome: string;
+  hora_inicio: string;
+  hora_fim: string;
+  dias_semana: number[];
+};
+
+export type Cobertura = {
+  id: string;
+  unidade_id: string;
+  turno: Turno2;
+  funcao_id: string;
+  dia_semana: number | null; // null = todos os dias
+  ideal: number;
+  minimo_reduzido: number | null; // null = igual ao ideal
+};
+
+export type TipoAusencia = "ferias" | "afastamento" | "indisponibilidade";
+
+export type Ausencia = {
+  id: string;
+  colaborador_id: string;
+  tipo: TipoAusencia;
+  data_inicio: string;
+  data_fim: string;
+  motivo: string | null;
+};
+
+export type Parametro = {
+  id: string;
+  unidade_id: string | null;
+  tipo: "operacional" | "legal";
+  chave: string;
+  descricao: string;
+  valor: string | null;
+  fonte: string | null;
+  validado: boolean;
+  observacao: string | null;
+};
+
+export type Feriado = {
+  id: string;
+  data: string;
+  nome: string;
+  unidade_id: string | null;
+};
