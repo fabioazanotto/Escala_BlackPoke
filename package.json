@@ -7,10 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sefaz:testar": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/testar-sefaz.mjs",
+    "sefaz:testar:legado": "node --openssl-legacy-provider --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/testar-sefaz.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
+    "fast-xml-parser": "^5.12.0",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",

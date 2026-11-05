@@ -42,3 +42,10 @@ next-env.d.ts
 
 # manter o exemplo de variáveis no repositório
 !.env.example
+
+# SEFAZ: certificado, estado e trava locais (dados fiscais nunca vão para o GitHub)
+*.pfx
+*.p12
+.sefaz-estado.json
+.sefaz-estado.json.tmp
+.sefaz.lock
