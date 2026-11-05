@@ -62,3 +62,28 @@ export type Perfil = {
   perfil: PerfilAcesso;
   ativo: boolean;
 };
+
+export type Funcao = {
+  id: string;
+  unidade_id: string;
+  nome: string;
+  operacao: string | null; // ex.: "Seu Miyagi", "BlackPoke"
+  ativa: boolean;
+};
+
+export type Turno2 = "dia" | "noite";
+
+export type Colaborador = {
+  id: string;
+  unidade_id: string;
+  nome: string;
+  cargo: string | null; // como está escrito na planilha ou no RH
+  matricula: string | null;
+  cpf: string | null;
+  telefone: string | null;
+  funcao_principal_id: string;
+  turno: Turno2;
+  data_admissao: string | null;
+  data_desligamento: string | null;
+  ativo: boolean;
+};

@@ -1,73 +1,46 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase, variaveisConfiguradas } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
+import type { Turno2 } from "@/lib/tipos";
 
-type Estado =
-  | { tipo: "carregando" }
-  | { tipo: "sem-variaveis" }
-  | { tipo: "erro"; mensagem: string }
-  | { tipo: "ok"; funcionarios: number; turnos: number };
+type Resumo = { id: string; nome: string; dia: number; noite: number };
 
 export default function Inicio() {
-  const [estado, setEstado] = useState<Estado>({ tipo: "carregando" });
+  const [resumo, setResumo] = useState<Resumo[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    async function verificar() {
-      if (!variaveisConfiguradas()) {
-        setEstado({ tipo: "sem-variaveis" });
-        return;
-      }
-      try {
-        const db = supabase();
-        const [f, t] = await Promise.all([
-          db.from("funcionarios").select("id", { count: "exact", head: true }),
-          db.from("turnos").select("id", { count: "exact", head: true }),
-        ]);
-        if (f.error) throw f.error;
-        if (t.error) throw t.error;
-        setEstado({ tipo: "ok", funcionarios: f.count ?? 0, turnos: t.count ?? 0 });
-      } catch (e) {
-        setEstado({ tipo: "erro", mensagem: e instanceof Error ? e.message : String(e) });
-      }
-    }
-    verificar();
+    const db = supabase();
+    Promise.all([
+      db.from("unidades").select("id, nome").eq("ativa", true).order("nome"),
+      db.from("colaboradores").select("unidade_id, turno").eq("ativo", true),
+    ]).then(([u, c]) => {
+      if (u.error || c.error) return setErro((u.error ?? c.error)!.message);
+      setResumo(
+        (u.data ?? []).map((x) => {
+          const meus = (c.data ?? []).filter((y) => y.unidade_id === x.id);
+          const conta = (t: Turno2) => meus.filter((y) => y.turno === t).length;
+          return { id: x.id, nome: x.nome, dia: conta("dia"), noite: conta("noite") };
+        }),
+      );
+    });
   }, []);
 
   return (
-    <div className="space-y-5">
-      <section className="cartao">
-        <h1 className="text-2xl font-bold">Sistema de escala, pronto para construir</h1>
-        <p className="mt-2 text-neutral-700">
-          Este é o ponto de partida. A estrutura, o banco de dados e a publicação já
-          estão configurados. As telas da escala serão criadas por você, com a IA,
-          durante a aula.
-        </p>
-      </section>
-
-      <section className="cartao">
-        <h2 className="text-lg font-semibold">Conexão com o banco de dados</h2>
-        {estado.tipo === "carregando" && <p className="mt-2 text-neutral-600">Verificando...</p>}
-        {estado.tipo === "sem-variaveis" && (
-          <p className="mt-2 text-red-700">
-            As variáveis do Supabase não foram configuradas. Na Vercel, em Settings &gt;
-            Environment Variables, adicione NEXT_PUBLIC_SUPABASE_URL e
-            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (ou ANON_KEY) e faça Redeploy.
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Painel</h1>
+      {erro && <p className="rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
+      {!resumo && !erro && <p className="text-neutral-600">Carregando…</p>}
+      {resumo?.map((u) => (
+        <section key={u.id} className="cartao">
+          <h2 className="text-lg font-semibold">{u.nome}</h2>
+          <p className="mt-1 text-neutral-700">
+            {u.dia + u.noite} colaboradores ativos · {u.dia} no dia · {u.noite} na noite
           </p>
-        )}
-        {estado.tipo === "erro" && (
-          <p className="mt-2 text-red-700">
-            Banco conectado, mas as tabelas não responderam. Rode o arquivo
-            supabase/schema.sql no SQL Editor do Supabase. Detalhe: {estado.mensagem}
-          </p>
-        )}
-        {estado.tipo === "ok" && (
-          <p className="mt-2 text-green-700">
-            Banco conectado. {estado.funcionarios} funcionários e {estado.turnos} turnos
-            cadastrados. Tudo pronto para a Entrega 1.
-          </p>
-        )}
-      </section>
+        </section>
+      ))}
+      {resumo && resumo.length === 0 && <p className="text-neutral-600">Nenhuma unidade disponível para o seu acesso.</p>}
     </div>
   );
 }
