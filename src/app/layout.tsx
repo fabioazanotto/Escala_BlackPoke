@@ -5,8 +5,8 @@ import { Estrutura } from "@/components/Estrutura";
 import { Sessao } from "@/components/Sessao";
 
 export const metadata: Metadata = {
-  title: `Escala · ${identidade.nome}`,
-  description: "Sistema de escala de funcionários",
+  title: `Gestão · ${identidade.nome}`,
+  description: "Sistema de gestão do restaurante",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
