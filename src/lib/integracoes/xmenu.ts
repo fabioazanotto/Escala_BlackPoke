@@ -7,7 +7,10 @@
 // Descobertas sobre a API (docs/xmenu-api.md):
 //  - valor e canal só existem em `closed-sales` (caixa fechado); a data base é a data do caixa;
 //  - o iFood não é um canal: aparece como `delivery.marketplaceOrderId` preenchido;
-//  - `/sales` (ao vivo) não traz canal e seus totais não batem com os do caixa fechado.
+//  - `/sales` (ao vivo) não traz canal e seus totais não batem com os do caixa fechado;
+//  - `from`/`to` são comparados com a data do caixa DEPOIS de converter o fuso para UTC: com "-03:00" o pedido de um dia
+//    traz o dia seguinte. Use datas sem fuso (veja `limitesDoDiaDeCaixa`);
+//  - `include=delivery` (sem `customer`) já devolve o cliente vazio.
 
 import { LOJAS_XMENU, VARIAVEL_URL_XMENU, type LojaXmenu } from "@/config/lojas";
 import type { CanalVenda, PeriodoCaixa, VendaResumida } from "@/lib/tipos";
@@ -208,10 +211,16 @@ export function paraVendaResumida(lojaChave: string, venda: Bruto): VendaResumid
 // ---------------------------------------------------------------- consultas
 
 export type FiltroVendas = {
-  de: string; // "2026-11-01T00:00:00-03:00"
-  ate: string;
+  de: string; // "2026-11-01T00:00:00" (sem fuso!)
+  ate: string; // "2026-11-01T23:59:59"
   incluirCanceladas?: boolean;
 };
+
+/** Limites, sem fuso, de um dia de caixa ("2026-11-05"), do jeito que o Xmenu entende. */
+export function limitesDoDiaDeCaixa(dia: string): { de: string; ate: string } {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) throw new ErroXmenu("REQUISICAO_INVALIDA", `Data inválida: ${dia}`);
+  return { de: `${dia}T00:00:00`, ate: `${dia}T23:59:59` };
+}
 
 const TAMANHO_PAGINA = 50;
 const MAXIMO_PAGINAS = 400; // trava de segurança: 20 mil vendas por consulta
@@ -230,6 +239,7 @@ export async function buscarVendasCaixaFechado(
       {
         from: filtro.de,
         to: filtro.ate,
+        include: "delivery", // traz o código de marketplace e não traz o cliente
         include_cancelled: filtro.incluirCanceladas ? true : undefined,
         limit: TAMANHO_PAGINA,
         offset: pagina * TAMANHO_PAGINA,
@@ -287,11 +297,12 @@ export async function diagnosticarLoja(loja: LojaXmenu, dependencias: Partial<De
     };
   }
   const agora = new Date();
-  const ontem = new Date(agora.getTime() - 2 * 86400000);
+  const doisDiasAtras = new Date(agora.getTime() - 2 * 86400000);
+  const semFuso = (d: Date) => d.toISOString().slice(0, 19); // o Xmenu espera datas sem fuso
   const testes = await Promise.all([
     testar("Horários da loja", () => obter(loja, "operations/store-hours", { limit: 1 }, dependencias)),
     testar("Vendas de caixa fechado", () =>
-      obter(loja, "cash-registers/closed-sales", { from: ontem.toISOString(), to: agora.toISOString(), limit: 1 }, dependencias),
+      obter(loja, "cash-registers/closed-sales", { from: semFuso(doisDiasAtras), to: semFuso(agora), limit: 1 }, dependencias),
     ),
   ]);
   return { ...base, testes };

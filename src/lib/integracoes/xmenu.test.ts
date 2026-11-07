@@ -5,6 +5,7 @@ import {
   classificarCanal,
   diagnosticarLoja,
   ErroXmenu,
+  limitesDoDiaDeCaixa,
   lerEnvelope,
   montarUrl,
   obter,
@@ -163,12 +164,25 @@ describe("busca de vendas por caixa fechado", () => {
       urls.push(url);
       return resposta(paginas[i++]);
     }) as unknown as typeof fetch;
-    const r = await buscarVendasCaixaFechado(loja, { de: "2026-11-01T00:00:00-03:00", ate: "2026-11-02T00:00:00-03:00" }, { env: ENV, fetchFn, ...RAPIDO });
+    const r = await buscarVendasCaixaFechado(loja, limitesDoDiaDeCaixa("2026-11-01"), { env: ENV, fetchFn, ...RAPIDO });
     expect(r.map((v) => v.saleId)).toEqual([719, 2, 3]);
     expect(r.map((v) => v.canal)).toEqual(["ifood", "balcao", "xmenu"]);
     expect(r[2].cancelada).toBe(true);
     expect(urls[0]).toContain("offset=0");
+    expect(urls[0]).toContain("include=delivery"); // sem o cliente
+    expect(urls[0]).toContain("from=2026-11-01T00%3A00%3A00&");
+    expect(urls[0]).not.toContain("-03");
     expect(urls[1]).toContain("offset=50");
+  });
+});
+
+describe("datas do caixa", () => {
+  it("o dia de caixa vai das 00:00:00 às 23:59:59, sem fuso", () => {
+    expect(limitesDoDiaDeCaixa("2026-11-05")).toEqual({ de: "2026-11-05T00:00:00", ate: "2026-11-05T23:59:59" });
+  });
+  it("recusa data em formato errado", () => {
+    expect(() => limitesDoDiaDeCaixa("05/11/2026")).toThrow(ErroXmenu);
+    expect(() => limitesDoDiaDeCaixa("2026-11-05T10:00:00")).toThrow(ErroXmenu);
   });
 });
 
