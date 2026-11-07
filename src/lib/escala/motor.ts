@@ -260,7 +260,10 @@ function montarTarefas(ctx: Contexto, celulas: Celulas, avisos: string[]): Taref
   // Domingos de descanso adicionais.
   const domingos = dias.filter((d) => diaDaSemana(d) === 0);
   for (const c of ordem) {
-    const jaTem = domingos.filter((d) => celulas[c.id][d] === "domingo").length;
+    // Uma folga semanal travada num domingo também vale como descanso de domingo.
+    const jaTem = domingos.filter(
+      (d) => celulas[c.id][d] === "domingo" || (celulas[c.id][d] === "folga" && ctx.travados.has(chave(c.id, d))),
+    ).length;
     const precisa = e.parametros.domingosPorMes - jaTem;
     if (precisa <= 0) continue;
     const opcoes = domingos.filter((d) => celulas[c.id][d] === "trabalha" && !ctx.travados.has(chave(c.id, d)));

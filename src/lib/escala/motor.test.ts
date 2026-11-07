@@ -192,6 +192,17 @@ describe("ausências, admissão e travas", () => {
     expect(r.travados).toContain(`${alvo.id}|2026-11-04`);
   });
 
+  it("folga semanal travada num domingo também vale como descanso de domingo", () => {
+    const alvo = equipe[0];
+    const domingos = ["2026-11-01", "2026-11-08", "2026-11-15", "2026-11-22", "2026-11-29"];
+    const travas = domingos.map((data) => ({ colaboradorId: alvo.id, data, situacao: "folga" as const }));
+    const r = gerarEscala(entrada(equipe, cobertura, { travas }));
+    for (const d of domingos) expect(r.celulas[alvo.id][d]).toBe("folga");
+    expect(contar(r, alvo.id, "domingo")).toBe(0); // não sobra outro domingo para descansar
+    expect(r.avisos.some((a) => a.includes("sem domingo disponível"))).toBe(false);
+    expect(contar(r, alvo.id, "folga")).toBe(5); // só as dos domingos: a semana já tem folga
+  });
+
   it("feriado não altera a distribuição, só é informado", () => {
     const base = gerarEscala(entrada(equipe, cobertura));
     const r = gerarEscala(entrada(equipe, cobertura, { feriados: ["2026-11-02", "2026-12-25"] }));
