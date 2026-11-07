@@ -92,6 +92,16 @@ export default function Colaboradores() {
     carregar();
   }, [carregar]);
 
+  // A pesquisa da barra superior chega pelo endereço (?busca=) ou por um evento quando já estamos aqui.
+  useEffect(() => {
+    const doEndereco = new URLSearchParams(window.location.search).get("busca");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (doEndereco) setBusca(doEndereco);
+    const ouvir = (e: Event) => setBusca(String((e as CustomEvent).detail ?? ""));
+    window.addEventListener("busca-colaborador", ouvir);
+    return () => window.removeEventListener("busca-colaborador", ouvir);
+  }, []);
+
   const funcaoPorId = useMemo(() => new Map(funcoes.map((f) => [f.id, f])), [funcoes]);
 
   const visiveis = lista.filter(

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { identidade } from "@/config/identidade";
-import { Cabecalho } from "@/components/Cabecalho";
+import { Estrutura } from "@/components/Estrutura";
 import { Sessao } from "@/components/Sessao";
 
 export const metadata: Metadata = {
@@ -14,18 +14,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   const estilo = {
     "--cor-principal": identidade.corPrincipal,
     "--cor-secundaria": identidade.corSecundaria,
+    "--cor-destaque": identidade.corDestaque,
   } as React.CSSProperties;
 
   return (
     <html lang="pt-BR" className="h-full antialiased" style={estilo}>
-      <body className="flex min-h-full flex-col">
+      <body className="min-h-full">
         <Sessao>
-          <Cabecalho />
-          <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">{children}</main>
+          <Estrutura>{children}</Estrutura>
         </Sessao>
-        <footer className="px-4 py-6 text-center text-xs text-neutral-500">
-          {identidade.nome} · sistema de escala
-        </footer>
       </body>
     </html>
   );

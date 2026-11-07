@@ -6,17 +6,9 @@ import { SeletorUnidade, useUnidades } from "@/components/SeletorUnidade";
 import { DIAS_SEMANA_CURTO, dataBR, hojeISO, paraData } from "@/lib/datas";
 import { rotuloFuncao, ROTULO_TURNO } from "@/lib/funcoes";
 import { avaliarEscala, diasDoMes, gerarEscala, sugerirAjustes } from "@/lib/escala/motor";
-import type { Celulas, EntradaMotor, ResultadoMotor, Situacao, Trava } from "@/lib/escala/tipos";
-import type { Funcao } from "@/lib/tipos";
-
-type Escala = { id: string; status: string; versao: number; gerada_em: string | null };
-
-const ROTULO_STATUS: Record<string, string> = {
-  rascunho: "Rascunho",
-  em_revisao: "Em revisão",
-  publicada: "Publicada",
-  publicada_com_alteracoes: "Publicada com alterações",
-};
+import { carregarDados, ROTULO_STATUS, type Dados } from "@/lib/escala/carregar";
+import { CabecalhoPagina } from "@/components/CabecalhoPagina";
+import type { ResultadoMotor, Situacao } from "@/lib/escala/tipos";
 
 const CELULA: Record<Situacao, { letra: string; classe: string; nome: string }> = {
   trabalha: { letra: "", classe: "bg-white", nome: "Trabalha" },
@@ -27,86 +19,6 @@ const CELULA: Record<Situacao, { letra: string; classe: string; nome: string }> 
   indisponibilidade: { letra: "I", classe: "bg-yellow-200 font-bold", nome: "Indisponibilidade" },
   fora: { letra: "–", classe: "bg-neutral-200 text-neutral-500", nome: "Fora do vínculo" },
 };
-
-type Dados = {
-  entrada: EntradaMotor;
-  nomes: Map<string, string>;
-  funcoes: Map<string, Funcao>;
-  escala: Escala | null;
-  celulasSalvas: Celulas | null;
-};
-
-async function carregarDados(unidadeId: string, ano: number, mes: number): Promise<Dados> {
-  const db = supabase();
-  const dias = diasDoMes(ano, mes);
-  const inicio = dias[0];
-  const fim = dias[dias.length - 1];
-
-  const [c, f, k, j, p, e] = await Promise.all([
-    db.from("colaboradores").select("id, nome, turno, funcao_principal_id, data_admissao, data_desligamento").eq("unidade_id", unidadeId).eq("ativo", true).order("nome"),
-    db.from("funcoes").select("id, unidade_id, nome, operacao, ativa").eq("unidade_id", unidadeId),
-    db.from("cobertura").select("turno, funcao_id, dia_semana, ideal, minimo_reduzido").eq("unidade_id", unidadeId),
-    db.from("jornadas").select("turno, hora_inicio, hora_fim, intervalo_minutos").eq("unidade_id", unidadeId),
-    db.from("parametros").select("tipo, chave, valor, validado").is("unidade_id", null),
-    db.from("escalas_mensais").select("id, status, versao, gerada_em").eq("unidade_id", unidadeId).eq("ano", ano).eq("mes", mes).maybeSingle(),
-  ]);
-  const erroBase = c.error ?? f.error ?? k.error ?? j.error ?? p.error ?? e.error;
-  if (erroBase) throw erroBase;
-
-  const ids = (c.data ?? []).map((x) => x.id);
-  const [extras, aus, fer, dd] = await Promise.all([
-    ids.length ? db.from("colaborador_funcoes").select("colaborador_id, funcao_id").in("colaborador_id", ids) : Promise.resolve({ data: [], error: null }),
-    ids.length ? db.from("ausencias").select("colaborador_id, tipo, data_inicio, data_fim").in("colaborador_id", ids).lte("data_inicio", fim).gte("data_fim", inicio) : Promise.resolve({ data: [], error: null }),
-    db.from("feriados").select("data, unidade_id").gte("data", inicio).lte("data", fim),
-    e.data ? db.from("escala_dias").select("colaborador_id, data, situacao, travado").eq("escala_id", e.data.id).limit(5000) : Promise.resolve({ data: [], error: null }),
-  ]);
-  const erro2 = extras.error ?? aus.error ?? fer.error ?? dd.error;
-  if (erro2) throw erro2;
-
-  const parametro = (chave: string): string | null => (p.data ?? []).find((x) => x.chave === chave)?.valor ?? null;
-  const diasFolga = (parametro("dias_folga_semanal") ?? "1,2,3").split(",").map((x) => Number(x.trim())).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
-  const domingos = Number(parametro("domingos_descanso_por_mes") ?? 1);
-
-  const travas: Trava[] = [];
-  const celulasSalvas: Celulas = {};
-  for (const r of dd.data ?? []) {
-    (celulasSalvas[r.colaborador_id] ??= {})[r.data] = r.situacao as Situacao;
-    if (r.travado && ["trabalha", "folga", "domingo"].includes(r.situacao)) {
-      travas.push({ colaboradorId: r.colaborador_id, data: r.data, situacao: r.situacao as Trava["situacao"] });
-    }
-  }
-
-  const entrada: EntradaMotor = {
-    ano,
-    mes,
-    colaboradores: (c.data ?? []).map((x) => ({
-      id: x.id,
-      nome: x.nome,
-      turno: x.turno,
-      funcaoPrincipalId: x.funcao_principal_id,
-      funcoesAdicionais: (extras.data ?? []).filter((y) => y.colaborador_id === x.id).map((y) => y.funcao_id),
-      admissao: x.data_admissao,
-      desligamento: x.data_desligamento,
-    })),
-    ausencias: (aus.data ?? []).map((x) => ({ colaboradorId: x.colaborador_id, tipo: x.tipo, inicio: x.data_inicio, fim: x.data_fim })),
-    cobertura: (k.data ?? []).map((x) => ({ turno: x.turno, funcaoId: x.funcao_id, diaSemana: x.dia_semana, ideal: x.ideal, minimoReduzido: x.minimo_reduzido })),
-    jornadas: (j.data ?? []).map((x) => ({ turno: x.turno, horaInicio: String(x.hora_inicio).slice(0, 5), horaFim: String(x.hora_fim).slice(0, 5), intervaloMinutos: x.intervalo_minutos })),
-    feriados: (fer.data ?? []).filter((x) => x.unidade_id === null || x.unidade_id === unidadeId).map((x) => x.data),
-    parametros: {
-      diasFolgaSemanal: diasFolga.length ? diasFolga : [1, 2, 3],
-      domingosPorMes: Number.isFinite(domingos) ? domingos : 1,
-      legais: (p.data ?? []).filter((x) => x.tipo === "legal").map((x) => ({ chave: x.chave, valor: x.valor, validado: x.validado })),
-    },
-    travas,
-  };
-  return {
-    entrada,
-    nomes: new Map(entrada.colaboradores.map((x) => [x.id, x.nome])),
-    funcoes: new Map((f.data as Funcao[]).map((x) => [x.id, x])),
-    escala: e.data as Escala | null,
-    celulasSalvas: e.data && Object.keys(celulasSalvas).length > 0 ? celulasSalvas : null,
-  };
-}
 
 export default function EscalaMensal() {
   const { unidades, unidadeId, setUnidadeId, erro: erroUnidades } = useUnidades();
@@ -195,12 +107,10 @@ export default function EscalaMensal() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Escala do mês</h1>
-      <SeletorUnidade unidades={unidades} valor={unidadeId} aoMudar={(id) => { setAviso(null); setDiaAberto(null); setUnidadeId(id); }} />
-      <label className="block">
-        <span className="mb-1 block font-medium">Mês</span>
-        <input className="campo" type="month" value={mesAno} onChange={(e) => { setAviso(null); setDiaAberto(null); setMesAno(e.target.value); }} />
-      </label>
+      <CabecalhoPagina titulo="Escala do mês">
+        <SeletorUnidade filtro unidades={unidades} valor={unidadeId} aoMudar={(id) => { setAviso(null); setDiaAberto(null); setUnidadeId(id); }} />
+        <input aria-label="Mês" className="filtro" type="month" value={mesAno} onChange={(e) => { setAviso(null); setDiaAberto(null); setMesAno(e.target.value); }} />
+      </CabecalhoPagina>
       {(erro || erroUnidades) && <p className="rounded-xl bg-red-50 p-3 text-red-700">{erro ?? erroUnidades}</p>}
       {aviso && <p className="rounded-xl bg-green-50 p-3 text-green-800">{aviso}</p>}
       {carregando && <p className="text-neutral-600">Carregando…</p>}
@@ -232,7 +142,7 @@ export default function EscalaMensal() {
                     {resultado.resumo.legaisNaoVerificados} exigência(s) trabalhista(s) ainda não validada(s): a escala não pôde ser conferida contra elas (tela Regras).
                   </p>
                 )}
-                <ul className="grid grid-cols-2 gap-2">
+                <ul className="grid grid-cols-2 gap-2 lg:grid-cols-6">
                   {[
                     ["Folgas programadas", resultado.resumo.folgasProgramadas],
                     ["Domingos de descanso", resultado.resumo.domingosDistribuidos],

@@ -11,7 +11,10 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ou o nome antigo `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
 - Tipos das tabelas em `src/lib/tipos.ts`; funções de data em `src/lib/datas.ts`.
 - Identidade visual (nome, cores, logo) em `src/config/identidade.ts`; menu em `src/config/menu.ts`.
-- Layout com cabeçalho e menu em `src/app/layout.tsx` e `src/components/Cabecalho.tsx`.
+- Layout em painel (sidebar à esquerda de 208 px + barra superior de 64 px) em `src/app/layout.tsx` e `src/components/Estrutura.tsx`.
+  Títulos de tela usam `CabecalhoPagina` (título 28/34 e filtros na mesma linha). No celular a sidebar vira gaveta.
+  Destinos do menu, abas de Configurações e caminho da barra superior ficam em `src/config/menu.ts`.
+- Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`.
 - Classes CSS prontas em `src/app/globals.css`: `.botao`, `.botao-secundario`, `.campo`, `.cartao`.
 - Documentação da API de ponto em `docs/api-ponto.md` e dados de exemplo em `docs/marcacoes-exemplo.json`.
 

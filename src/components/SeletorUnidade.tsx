@@ -33,11 +33,23 @@ export function SeletorUnidade({
   unidades,
   valor,
   aoMudar,
+  filtro = false,
 }: {
   unidades: Unidade[];
   valor: string;
   aoMudar: (id: string) => void;
+  /** true = versão compacta para a linha do título, sem rótulo visível */
+  filtro?: boolean;
 }) {
+  if (filtro) {
+    return (
+      <select aria-label="Unidade" className="filtro" value={valor} onChange={(e) => aoMudar(e.target.value)}>
+        {unidades.map((u) => (
+          <option key={u.id} value={u.id}>{u.nome}</option>
+        ))}
+      </select>
+    );
+  }
   return (
     <label className="block">
       <span className="mb-1 block font-medium">Unidade</span>
