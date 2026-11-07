@@ -16,6 +16,8 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   Destinos do menu (Vendas, RH, Configurações), abas, caminho da barra superior e quem pode abrir cada área ficam em `src/config/menu.ts`.
   Perfis: `admin` (tudo, inclusive Vendas), `rh` e `gerencia`. Use `ehRH(perfil)` (`src/lib/acesso.ts`): admin vale como RH.
   A área Vendas é só do admin e vai puxar dados do Xmenu (somente leitura; tokens por loja ficam nas variáveis da Vercel, nunca no código).
+  Integração Xmenu (somente leitura, no servidor): `src/lib/integracoes/xmenu.ts`; lojas em `src/config/lojas.ts`; notas da API em `docs/xmenu-api.md`.
+  Rota de diagnóstico `/api/xmenu/diagnostico` (só admin) e botão "Testar conexão" em Vendas.
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
   tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
   Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).

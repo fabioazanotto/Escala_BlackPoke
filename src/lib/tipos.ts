@@ -145,3 +145,26 @@ export type Feriado = {
   nome: string;
   unidade_id: string | null;
 };
+
+// ---- Vendas (Xmenu) ----
+
+export type CanalVenda = "ifood" | "xmenu" | "balcao" | "outros";
+
+export type PeriodoCaixa = "manha" | "tarde" | "noite";
+
+/** Venda de um caixa fechado, só com o que o painel precisa. Nenhum dado de cliente. */
+export type VendaResumida = {
+  lojaChave: string;
+  saleId: number;
+  saleGuid: string;
+  dataCaixa: string; // "2026-11-07" (data do caixa)
+  periodo: PeriodoCaixa | null;
+  canal: CanalVenda;
+  entrega: boolean;
+  retirada: boolean;
+  cancelada: boolean;
+  bruto: number; // itens
+  desconto: number;
+  taxaEntrega: number;
+  liquido: number; // total líquido da venda
+};
