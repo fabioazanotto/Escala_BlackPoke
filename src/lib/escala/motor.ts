@@ -492,9 +492,12 @@ export function gerarEscala(entrada: EntradaMotor): ResultadoMotor {
 /** Avalia uma escala já existente (por exemplo, a que foi salva ou editada à mão). */
 export function avaliarEscala(entrada: EntradaMotor, celulas: Celulas): ResultadoMotor {
   const dias = diasDoMes(entrada.ano, entrada.mes);
-  const { travados } = celulasBase(entrada, dias);
-  const ctx = criarContexto(entrada, travados);
-  return montarResultado(ctx, celulas, []);
+  const base = celulasBase(entrada, dias);
+  const ctx = criarContexto(entrada, base.travados);
+  // Quem entrou depois da geração (ou dias sem registro) é tratado pela situação de base.
+  const completas: Celulas = {};
+  for (const c of entrada.colaboradores) completas[c.id] = { ...base.celulas[c.id], ...(celulas[c.id] ?? {}) };
+  return montarResultado(ctx, completas, []);
 }
 
 /** Ajustes possíveis para um posto descoberto. Só sugere: nunca aplica. */

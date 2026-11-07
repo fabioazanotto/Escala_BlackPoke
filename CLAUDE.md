@@ -14,7 +14,9 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
 - Layout em painel (sidebar à esquerda de 208 px + barra superior de 64 px) em `src/app/layout.tsx` e `src/components/Estrutura.tsx`.
   Títulos de tela usam `CabecalhoPagina` (título 28/34 e filtros na mesma linha). No celular a sidebar vira gaveta.
   Destinos do menu, abas de Configurações e caminho da barra superior ficam em `src/config/menu.ts`.
-- Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`.
+- Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
+  tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
+  Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).
 - Classes CSS prontas em `src/app/globals.css`: `.botao`, `.botao-secundario`, `.campo`, `.cartao`.
 - Documentação da API de ponto em `docs/api-ponto.md` e dados de exemplo em `docs/marcacoes-exemplo.json`.
 
