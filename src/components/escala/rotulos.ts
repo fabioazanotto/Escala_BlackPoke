@@ -7,6 +7,7 @@ export const CELULA: Record<Situacao, { letra: string; classe: string; nome: str
   ferias: { letra: "Fé", classe: "bg-green-200 font-bold", nome: "Férias" },
   afastamento: { letra: "A", classe: "bg-orange-200 font-bold", nome: "Afastamento" },
   indisponibilidade: { letra: "I", classe: "bg-yellow-200 font-bold", nome: "Indisponibilidade" },
+  dobra: { letra: "Db", classe: "bg-pink-200 font-bold", nome: "Dobra (dois turnos)" },
   fora: { letra: "–", classe: "bg-neutral-200 text-neutral-500", nome: "Fora do vínculo" },
 };
 

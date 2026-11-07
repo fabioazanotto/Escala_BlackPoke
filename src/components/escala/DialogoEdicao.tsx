@@ -43,7 +43,8 @@ export function DialogoEdicao({
   const [erro, setErro] = useState<string | null>(null);
   const primeiro = useRef<HTMLInputElement>(null);
 
-  const editavel = podeEditar && SITUACOES_EDITAVEIS.includes(atual);
+  const editavel = podeEditar && (SITUACOES_EDITAVEIS.includes(atual) || atual === "dobra");
+  const opcoes: Situacao[] = atual === "dobra" ? [...SITUACOES_EDITAVEIS, "dobra"] : SITUACOES_EDITAVEIS;
 
   useEffect(() => {
     primeiro.current?.focus();
@@ -114,7 +115,7 @@ export function DialogoEdicao({
           <div className="space-y-4">
             <fieldset className="space-y-2">
               <legend className="mb-1 text-sm font-medium">Situação neste dia</legend>
-              {SITUACOES_EDITAVEIS.map((s, i) => (
+              {opcoes.map((s, i) => (
                 <label
                   key={s}
                   className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${nova === s ? "border-neutral-900 bg-neutral-50 font-semibold" : "border-neutral-300"}`}

@@ -45,6 +45,7 @@ export function PainelDia({
         <div>
           <h2 className="text-base font-semibold">{DIAS_SEMANA[dow]}, {dataBR(data)}</h2>
           {resultado.feriados.includes(data) && <p className="text-xs text-amber-800">Feriado</p>}
+          {resultado.fechados.includes(data) && <p className="text-xs text-neutral-700">Unidade sem funcionamento neste dia</p>}
         </div>
         <button aria-label="Fechar detalhes do dia" className="rounded-lg p-1.5 hover:bg-neutral-100" onClick={aoFechar}>
           <Icone nome="fechar" />
@@ -53,7 +54,11 @@ export function PainelDia({
       <div className="flex-1 space-y-6 overflow-y-auto p-5">
         <section>
           <h3 className="mb-2 text-sm font-semibold text-neutral-700">Cobertura</h3>
-          {slots.length === 0 && <p className="text-sm text-neutral-600">Nenhuma exigência de cobertura para este dia.</p>}
+          {slots.length === 0 && (
+            <p className="text-sm text-neutral-600">
+              {resultado.fechados.includes(data) ? "Unidade sem funcionamento: não se cobra cobertura." : "Nenhuma exigência de cobertura para este dia."}
+            </p>
+          )}
           <ul className="space-y-2">
             {slots.map((s) => {
               const ajustes = s.estado === "completa" ? [] : sugerirAjustes(entrada, resultado, s.data, s.turno, s.funcaoId);

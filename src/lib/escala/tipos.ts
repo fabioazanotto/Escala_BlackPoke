@@ -9,6 +9,7 @@ export type Situacao =
   | "ferias"
   | "afastamento"
   | "indisponibilidade"
+  | "dobra" // trabalha os dois turnos no dia (exceção prevista numa regra da unidade)
   | "fora"; // antes da admissão ou depois do desligamento
 
 export type TipoAusenciaMotor = "ferias" | "afastamento" | "indisponibilidade";
@@ -60,6 +61,21 @@ export type Trava = {
   situacao: "trabalha" | "folga" | "domingo";
 };
 
+/** Regras criadas pelo RH para uma unidade. */
+export type RegraMotor =
+  | { tipo: "folga_fixa"; colaboradorId: string; diasSemana: number[] }
+  | {
+      // A folga em diaA e B em diaB; na semana seguinte invertem. A semana de "ancora" tem A em diaA.
+      tipo: "alternancia";
+      colaboradorA: string;
+      colaboradorB: string;
+      diaA: number;
+      diaB: number;
+      ancora: string;
+    }
+  | { tipo: "dobra"; cobreId: string; cobertoId: string } // quando "cobertoId" folga, "cobreId" dobra e cobre o posto dele
+  | { tipo: "dia_fechado"; data: string; folgaColetiva: boolean };
+
 export type EntradaMotor = {
   ano: number;
   mes: number; // 1 a 12
@@ -70,6 +86,7 @@ export type EntradaMotor = {
   feriados: string[];
   parametros: ParametrosMotor;
   travas: Trava[];
+  regras?: RegraMotor[];
 };
 
 /** colaboradorId -> data -> situação */
@@ -109,6 +126,7 @@ export type Resumo = {
   diasComDeficit: number;
   conflitos: number;
   legaisNaoVerificados: number;
+  dobras: number;
 };
 
 export type ResultadoMotor = {
@@ -116,6 +134,8 @@ export type ResultadoMotor = {
   celulas: Celulas;
   travados: string[]; // chaves "colaboradorId|data"
   feriados: string[];
+  fechados: string[]; // dias sem funcionamento (regra da unidade)
+  dobrasPorColaborador: Record<string, number>;
   cobertura: ResultadoCobertura[];
   conflitos: Conflito[];
   avisos: string[];

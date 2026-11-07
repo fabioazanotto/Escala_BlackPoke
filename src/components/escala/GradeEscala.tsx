@@ -36,7 +36,7 @@ export function GradeEscala({
               return (
                 <th
                   key={d}
-                  className={`border-b p-0 text-center ${dow === 0 ? "bg-purple-50" : ""} ${resultado.feriados.includes(d) ? "bg-amber-100" : ""} ${diaSelecionado === d ? "outline outline-2 -outline-offset-2 outline-neutral-900" : ""}`}
+                  className={`border-b p-0 text-center ${dow === 0 ? "bg-purple-50" : ""} ${resultado.feriados.includes(d) ? "bg-amber-100" : ""} ${resultado.fechados.includes(d) ? "bg-neutral-300" : ""} ${diaSelecionado === d ? "outline outline-2 -outline-offset-2 outline-neutral-900" : ""}`}
                 >
                   <button
                     className="w-full px-1 py-1.5 hover:bg-neutral-100"

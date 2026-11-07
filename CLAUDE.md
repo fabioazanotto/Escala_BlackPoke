@@ -17,6 +17,8 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
   tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
   Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).
+  Regras por unidade (folga fixa, alternância, dobra, dia sem funcionamento) ficam em `regras_unidade`, são criadas só pelo RH em
+  `/regras-da-unidade` e aplicadas pelo motor (`src/lib/escala/regras.ts`). Dobra é exceção ao turno fixo e aparece como "Dobra" na escala.
 - Classes CSS prontas em `src/app/globals.css`: `.botao`, `.botao-secundario`, `.campo`, `.cartao`.
 - Documentação da API de ponto em `docs/api-ponto.md` e dados de exemplo em `docs/marcacoes-exemplo.json`.
 

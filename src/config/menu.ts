@@ -19,7 +19,7 @@ export const destinos: Destino[] = [
     rotulo: "Configurações",
     href: "/unidades",
     icone: "configuracoes",
-    rotas: ["/unidades", "/funcoes", "/horarios", "/regras"],
+    rotas: ["/unidades", "/funcoes", "/horarios", "/regras", "/regras-da-unidade"],
   },
 ];
 
@@ -29,6 +29,7 @@ export const abasConfiguracoes: { rotulo: string; href: string }[] = [
   { rotulo: "Funções", href: "/funcoes" },
   { rotulo: "Horários", href: "/horarios" },
   { rotulo: "Regras e feriados", href: "/regras" },
+  { rotulo: "Regras da unidade", href: "/regras-da-unidade" },
 ];
 
 // Caminho mostrado na barra superior.
@@ -43,6 +44,7 @@ export const trilhas: Record<string, string[]> = {
   "/funcoes": ["Configurações", "Funções"],
   "/horarios": ["Configurações", "Horários"],
   "/regras": ["Configurações", "Regras e feriados"],
+  "/regras-da-unidade": ["Configurações", "Regras da unidade"],
 };
 
 // Telas que usam a largura toda da área útil. As demais ficam numa coluna mais estreita.

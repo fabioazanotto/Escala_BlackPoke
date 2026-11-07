@@ -40,7 +40,7 @@ export function CalendarioEscala({
       ids.filter((id) => resultado.celulas[id][d] === situacao).map((id) => primeiroNome(nomes.get(id) ?? "?"));
     const ausentes = ids.filter((id) => ["ferias", "afastamento", "indisponibilidade"].includes(resultado.celulas[id][d])).length;
     const trabalham = Object.keys(resultado.celulas).filter((id) => resultado.celulas[id][d] === "trabalha").length;
-    return { faltando, reduzida, folgas: nomesDe("folga"), domingos: nomesDe("domingo"), ausentes, trabalham };
+    return { faltando, reduzida, folgas: nomesDe("folga"), domingos: nomesDe("domingo"), dobras: nomesDe("dobra"), ausentes, trabalham };
   };
 
   return (
@@ -57,14 +57,15 @@ export function CalendarioEscala({
           ))}
           {dias.map((d) => {
             const r = resumoDoDia(d);
-            const estado = r.faltando > 0 ? "deficit" : r.reduzida > 0 ? "reduzida" : "completa";
+            const fechado = resultado.fechados.includes(d);
+            const estado = fechado ? "fechado" : r.faltando > 0 ? "deficit" : r.reduzida > 0 ? "reduzida" : "completa";
             const feriado = resultado.feriados.includes(d);
             const selecionado = diaSelecionado === d;
             return (
               <button
                 key={d}
                 onClick={() => aoClicarDia(d)}
-                aria-label={`${dataBR(d)}: ${estado === "deficit" ? `${r.faltando} pessoa(s) faltando` : estado === "reduzida" ? "cobertura reduzida autorizada" : "cobertura completa"}`}
+                aria-label={`${dataBR(d)}: ${estado === "fechado" ? "unidade sem funcionamento" : estado === "deficit" ? `${r.faltando} pessoa(s) faltando` : estado === "reduzida" ? "cobertura reduzida autorizada" : "cobertura completa"}`}
                 className={`flex min-h-28 flex-col gap-1 bg-white p-2 text-left text-xs hover:bg-neutral-50 ${selecionado ? "outline outline-2 -outline-offset-2 outline-neutral-900" : ""}`}
               >
                 <span className="flex items-center justify-between">
@@ -84,6 +85,12 @@ export function CalendarioEscala({
                       Reduzida
                     </>
                   )}
+                  {estado === "fechado" && (
+                    <>
+                      <Icone nome="info" tamanho={13} className="text-neutral-600" />
+                      Unidade fechada
+                    </>
+                  )}
                   {estado === "completa" && (
                     <>
                       <Icone nome="ok" tamanho={13} className="text-green-700" />
@@ -93,6 +100,7 @@ export function CalendarioEscala({
                 </span>
                 {r.folgas.length > 0 && <span className="text-neutral-700"><strong>Folga:</strong> {r.folgas.join(", ")}</span>}
                 {r.domingos.length > 0 && <span className="text-purple-900"><strong>Domingo:</strong> {r.domingos.join(", ")}</span>}
+                {r.dobras.length > 0 && <span className="text-pink-900"><strong>Dobra:</strong> {r.dobras.join(", ")}</span>}
                 {r.ausentes > 0 && <span className="text-neutral-600">{r.ausentes} ausente(s)</span>}
                 <span className="mt-auto text-neutral-500">{r.trabalham} trabalham</span>
               </button>

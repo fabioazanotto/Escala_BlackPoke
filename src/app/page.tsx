@@ -115,7 +115,8 @@ export default function Painel() {
         folgas: conta("folga"),
         domingos: conta("domingo"),
         ausencias: conta("ferias", "afastamento", "indisponibilidade"),
-        trabalhados: conta("trabalha"),
+        dobras: conta("dobra"),
+        trabalhados: conta("trabalha", "dobra"),
       };
     });
   }, [dados, resultado]);
@@ -206,6 +207,7 @@ export default function Painel() {
                 <th className="px-3 py-2.5 text-right font-medium">Folgas</th>
                 <th className="px-3 py-2.5 text-right font-medium">Domingo de descanso</th>
                 <th className="px-3 py-2.5 text-right font-medium">Ausências (dias)</th>
+                <th className="px-3 py-2.5 text-right font-medium">Dobras</th>
                 <th className="px-5 py-2.5 text-right font-medium">Dias trabalhados</th>
               </tr>
             </thead>
@@ -218,12 +220,13 @@ export default function Painel() {
                   <td className="px-3 py-2.5 text-right">{l.folgas}</td>
                   <td className="px-3 py-2.5 text-right">{l.domingos}</td>
                   <td className="px-3 py-2.5 text-right">{l.ausencias}</td>
+                  <td className="px-3 py-2.5 text-right">{l.dobras}</td>
                   <td className="px-5 py-2.5 text-right">{l.trabalhados}</td>
                 </tr>
               ))}
               {linhas.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-neutral-600">
+                  <td colSpan={8} className="px-5 py-8 text-center text-neutral-600">
                     {dados && !resultado ? "Sem escala gerada para este mês." : "Nada para mostrar ainda."}
                   </td>
                 </tr>

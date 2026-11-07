@@ -2,7 +2,8 @@
 
 import { supabase } from "@/lib/supabase";
 import { diasDoMes } from "@/lib/escala/motor";
-import type { Celulas, EntradaMotor, Situacao, Trava } from "@/lib/escala/tipos";
+import { regraDoBanco } from "@/lib/escala/regras";
+import type { Celulas, EntradaMotor, RegraMotor, Situacao, Trava } from "@/lib/escala/tipos";
 import type { Funcao } from "@/lib/tipos";
 
 export type Escala = { id: string; status: string; versao: number; gerada_em: string | null };
@@ -28,15 +29,16 @@ export async function carregarDados(unidadeId: string, ano: number, mes: number)
   const inicio = dias[0];
   const fim = dias[dias.length - 1];
 
-  const [c, f, k, j, p, e] = await Promise.all([
+  const [c, f, k, j, p, e, rg] = await Promise.all([
     db.from("colaboradores").select("id, nome, turno, funcao_principal_id, data_admissao, data_desligamento").eq("unidade_id", unidadeId).eq("ativo", true).order("nome"),
     db.from("funcoes").select("id, unidade_id, nome, operacao, ativa").eq("unidade_id", unidadeId),
     db.from("cobertura").select("turno, funcao_id, dia_semana, ideal, minimo_reduzido").eq("unidade_id", unidadeId),
     db.from("jornadas").select("turno, hora_inicio, hora_fim, intervalo_minutos").eq("unidade_id", unidadeId),
     db.from("parametros").select("tipo, chave, valor, validado").is("unidade_id", null),
     db.from("escalas_mensais").select("id, status, versao, gerada_em").eq("unidade_id", unidadeId).eq("ano", ano).eq("mes", mes).maybeSingle(),
+    db.from("regras_unidade").select("tipo, parametros").eq("unidade_id", unidadeId).eq("ativa", true).order("criado_em"),
   ]);
-  const erroBase = c.error ?? f.error ?? k.error ?? j.error ?? p.error ?? e.error;
+  const erroBase = c.error ?? f.error ?? k.error ?? j.error ?? p.error ?? e.error ?? rg.error;
   if (erroBase) throw erroBase;
 
   const ids = (c.data ?? []).map((x) => x.id);
@@ -84,6 +86,7 @@ export async function carregarDados(unidadeId: string, ano: number, mes: number)
       legais: (p.data ?? []).filter((x) => x.tipo === "legal").map((x) => ({ chave: x.chave, valor: x.valor, validado: x.validado })),
     },
     travas,
+    regras: (rg.data ?? []).map((x: { tipo: string; parametros: unknown }) => regraDoBanco(x.tipo, x.parametros)).filter((x): x is RegraMotor => x !== null),
   };
   return {
     entrada,

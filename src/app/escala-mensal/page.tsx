@@ -242,6 +242,15 @@ export default function EscalaMensal() {
                     </li>
                   ))}
                 </ul>
+                {resultado.resumo.dobras > 0 && (
+                  <p className="text-sm text-pink-900">
+                    <strong>{resultado.resumo.dobras} dobra(s) no mês</strong> (regras da unidade):{" "}
+                    {Object.entries(resultado.dobrasPorColaborador).map(([id, n]) => `${dados.nomes.get(id) ?? "?"} ${n}`).join(" · ")}
+                  </p>
+                )}
+                {resultado.fechados.length > 0 && (
+                  <p className="text-sm text-neutral-700">Sem funcionamento: {resultado.fechados.map((d) => dataBR(d).slice(0, 5)).join(", ")}.</p>
+                )}
                 {resultado.conflitos.length > 0 && (
                   <ul className="list-disc space-y-1 pl-5 text-red-700">
                     {resultado.conflitos.map((c, i) => <li key={i}>{c.mensagem}</li>)}

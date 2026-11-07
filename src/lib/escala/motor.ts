@@ -5,14 +5,15 @@
 // exigências trabalhistas VALIDADAS. Objetivos: reduzir déficits e equilibrar folgas.
 // Nada é presumido: uma função só cobre outra se estiver autorizada no cadastro.
 
-import { inicioDaSemana, paraData, paraISO, somarDias } from "../datas";
-import { descansoEntreJornadasMin, duracaoEfetivaMin } from "./jornada";
+import { horaParaMinutos, inicioDaSemana, paraData, paraISO, somarDias } from "../datas";
+import { descansoEntreJornadasMin, duracaoEfetivaMin, duracaoJornadaMin } from "./jornada";
 import type {
   Ajuste,
   Celulas,
   ColaboradorMotor,
   Conflito,
   EntradaMotor,
+  RegraMotor,
   ResultadoCobertura,
   ResultadoMotor,
   Situacao,
@@ -54,14 +55,25 @@ export function semanasDoMes(
 
 type Exigencia = { funcaoId: string; ideal: number; minimo: number };
 
+type RegraDobra = Extract<RegraMotor, { tipo: "dobra" }>;
+
 type Contexto = {
   e: EntradaMotor;
   dias: string[];
   porTurno: Record<Turno, ColaboradorMotor[]>;
-  travados: Set<string>;
+  colab: Map<string, ColaboradorMotor>;
+  travados: Set<string>; // travas manuais do gerente
+  bloqueados: Set<string>; // travas manuais + situações fixadas por regras da unidade
+  fechados: Set<string>; // dias sem funcionamento
+  dobras: RegraDobra[];
+  folgaFixa: Map<string, number[]>; // colaborador -> dias da semana permitidos para a folga semanal
+  virtual: boolean; // durante a otimização, uma dobra possível já conta na cobertura
   exigencias: (data: string, turno: Turno) => Exigencia[];
   limiteSequencia: { limite: number; peso: number };
 };
+
+/** Trabalha naquele dia (inclui a dobra). */
+const trabalhando = (s: Situacao | undefined) => s === "trabalha" || s === "dobra";
 
 function numeroLegal(e: EntradaMotor, chaveParametro: string): number | null {
   const p = e.parametros.legais.find((x) => x.chave === chaveParametro);
@@ -70,8 +82,14 @@ function numeroLegal(e: EntradaMotor, chaveParametro: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function criarContexto(e: EntradaMotor, travados: Set<string>): Contexto {
+function criarContexto(e: EntradaMotor, travados: Set<string>, fixas: Set<string>): Contexto {
   const dias = diasDoMes(e.ano, e.mes);
+  const regras = e.regras ?? [];
+  const fechados = new Set(regras.flatMap((r) => (r.tipo === "dia_fechado" ? [r.data] : [])));
+  const ativos = new Set(e.colaboradores.map((c) => c.id));
+  const dobras = regras.filter((r): r is RegraDobra => r.tipo === "dobra" && ativos.has(r.cobreId) && ativos.has(r.cobertoId));
+  const folgaFixa = new Map<string, number[]>();
+  for (const r of regras) if (r.tipo === "folga_fixa" && ativos.has(r.colaboradorId)) folgaFixa.set(r.colaboradorId, r.diasSemana);
   const ordenados = [...e.colaboradores].sort(
     (a, b) => a.nome.localeCompare(b.nome, "pt-BR") || a.id.localeCompare(b.id),
   );
@@ -81,6 +99,7 @@ function criarContexto(e: EntradaMotor, travados: Set<string>): Contexto {
   };
   const cache = new Map<string, Exigencia[]>();
   const exigencias = (data: string, turno: Turno): Exigencia[] => {
+    if (fechados.has(data)) return []; // unidade fechada: não há cobertura a cobrar
     const dow = diaDaSemana(data);
     const k = `${turno}|${dow}`;
     const guardado = cache.get(k);
@@ -100,16 +119,54 @@ function criarContexto(e: EntradaMotor, travados: Set<string>): Contexto {
   };
   const maxDias = numeroLegal(e, "dias_consecutivos_maximos");
   const limiteSequencia = maxDias !== null ? { limite: maxDias, peso: 5000 } : { limite: 6, peso: 20 };
-  return { e, dias, porTurno, travados, exigencias, limiteSequencia };
+  return {
+    e,
+    dias,
+    porTurno,
+    colab: new Map(e.colaboradores.map((c) => [c.id, c])),
+    travados,
+    bloqueados: new Set([...travados, ...fixas]),
+    fechados,
+    dobras,
+    folgaFixa,
+    virtual: false,
+    exigencias,
+    limiteSequencia,
+  };
 }
 
 // ---------------------------------------------------------------- situação base
 
 const PRIORIDADE_AUSENCIA = ["afastamento", "ferias", "indisponibilidade"] as const;
 
-function celulasBase(e: EntradaMotor, dias: string[]): { celulas: Celulas; travados: Set<string> } {
+/** Datas de folga de cada pessoa numa alternância (A em diaA, B em diaB; invertem a cada semana). */
+export function datasDaAlternancia(
+  regra: Extract<RegraMotor, { tipo: "alternancia" }>,
+  dias: string[],
+): { a: string[]; b: string[] } {
+  const noMes = new Set(dias);
+  const segundaAncora = paraData(inicioDaSemana(regra.ancora)).getTime();
+  const a: string[] = [];
+  const b: string[] = [];
+  for (const segunda of [...new Set(dias.map(inicioDaSemana))].sort()) {
+    const k = Math.round((paraData(segunda).getTime() - segundaAncora) / (7 * 86400000));
+    const par = ((k % 2) + 2) % 2 === 0;
+    const dataDe = (dow: number) => somarDias(segunda, (dow + 6) % 7);
+    const dA = dataDe(par ? regra.diaA : regra.diaB);
+    const dB = dataDe(par ? regra.diaB : regra.diaA);
+    if (noMes.has(dA)) a.push(dA);
+    if (noMes.has(dB)) b.push(dB);
+  }
+  return { a, b };
+}
+
+function celulasBase(
+  e: EntradaMotor,
+  dias: string[],
+): { celulas: Celulas; travados: Set<string>; fixas: Set<string> } {
   const celulas: Celulas = {};
   const travados = new Set<string>();
+  const fixas = new Set<string>();
   const travaPor = new Map<string, Trava["situacao"]>();
   for (const t of e.travas) travaPor.set(chave(t.colaboradorId, t.data), t.situacao);
 
@@ -137,7 +194,25 @@ function celulasBase(e: EntradaMotor, dias: string[]): { celulas: Celulas; trava
     }
     celulas[c.id] = linha;
   }
-  return { celulas, travados };
+
+  // Situações fixadas por regras da unidade (a trava manual do gerente sempre vale mais).
+  const fixar = (colaboradorId: string, data: string, situacao: Situacao) => {
+    const k = chave(colaboradorId, data);
+    if (celulas[colaboradorId]?.[data] !== "trabalha" || travados.has(k)) return;
+    celulas[colaboradorId][data] = situacao;
+    fixas.add(k);
+  };
+  for (const r of e.regras ?? []) {
+    if (r.tipo === "dia_fechado" && r.folgaColetiva) {
+      for (const c of e.colaboradores) fixar(c.id, r.data, "folga");
+    }
+    if (r.tipo === "alternancia") {
+      const { a, b } = datasDaAlternancia(r, dias);
+      for (const d of a) fixar(r.colaboradorA, d, "folga");
+      for (const d of b) fixar(r.colaboradorB, d, "folga");
+    }
+  }
+  return { celulas, travados, fixas };
 }
 
 // ---------------------------------------------------------------- cobertura
@@ -149,7 +224,7 @@ function presentesPorFuncao(ctx: Contexto, celulas: Celulas, data: string, turno
   const presentes = new Map(exig.map((x) => [x.funcaoId, 0]));
   const sobra: ColaboradorMotor[] = [];
   for (const c of ctx.porTurno[turno]) {
-    if (celulas[c.id][data] !== "trabalha") continue;
+    if (!trabalhando(celulas[c.id][data])) continue;
     const f = c.funcaoPrincipalId;
     if (presentes.has(f) && presentes.get(f)! < ideais.get(f)!) presentes.set(f, presentes.get(f)! + 1);
     else sobra.push(c);
@@ -167,6 +242,27 @@ function presentesPorFuncao(ctx: Contexto, celulas: Celulas, data: string, turno
       }
     }
     if (melhor) presentes.set(melhor, presentes.get(melhor)! + 1);
+  }
+  // Dobra prevista numa regra: quem trabalha os dois turnos cobre o posto de quem folgou.
+  if (ctx.dobras.length > 0) {
+    const usados = new Set<string>();
+    for (const x of exig) {
+      let p = presentes.get(x.funcaoId)!;
+      for (const r of ctx.dobras) {
+        if (p >= x.ideal) break;
+        const a = ctx.colab.get(r.cobertoId);
+        const b = ctx.colab.get(r.cobreId);
+        if (!a || !b || a.turno !== turno || b.turno === turno || a.funcaoPrincipalId !== x.funcaoId) continue;
+        const sa = celulas[a.id][data];
+        if (sa !== "folga" && sa !== "domingo") continue;
+        const sb = celulas[b.id][data];
+        const pode = sb === "dobra" || (ctx.virtual && sb === "trabalha" && !ctx.bloqueados.has(chave(b.id, data)));
+        if (!pode || usados.has(b.id)) continue;
+        usados.add(b.id);
+        p++;
+      }
+      presentes.set(x.funcaoId, p);
+    }
   }
   return presentes;
 }
@@ -224,7 +320,7 @@ function custo(ctx: Contexto, celulas: Celulas): number {
   for (const c of ctx.e.colaboradores) {
     let seguidos = 0;
     for (const data of ctx.dias) {
-      if (celulas[c.id][data] === "trabalha") {
+      if (trabalhando(celulas[c.id][data])) {
         seguidos++;
         if (seguidos > limite) total += peso;
       } else {
@@ -245,13 +341,16 @@ function montarTarefas(ctx: Contexto, celulas: Celulas, avisos: string[]): Taref
   const ordem = [...ctx.porTurno.dia, ...ctx.porTurno.noite];
   const tarefas: Tarefa[] = [];
 
-  // Uma folga semanal por semana, nos dias preferidos (padrão: segunda a quarta).
+  // Uma folga semanal por semana, nos dias preferidos (padrão: segunda a quarta) ou nos dias da regra "folga fixa".
+  const noMes = new Set(dias);
   for (const semana of semanasDoMes(dias, e.parametros.diasFolgaSemanal)) {
     for (const c of ordem) {
-      const jaTemFolga = semana.dias.some((d) => celulas[c.id][d] === "folga" && ctx.travados.has(chave(c.id, d)));
+      const jaTemFolga = semana.dias.some((d) => celulas[c.id][d] === "folga" && ctx.bloqueados.has(chave(c.id, d)));
       if (jaTemFolga) continue;
-      const opcoes = semana.candidatos.filter(
-        (d) => celulas[c.id][d] === "trabalha" && !ctx.travados.has(chave(c.id, d)),
+      const fixos = ctx.folgaFixa.get(c.id);
+      const candidatos = fixos ? semana.dias.filter((d) => noMes.has(d) && fixos.includes(diaDaSemana(d))) : semana.candidatos;
+      const opcoes = candidatos.filter(
+        (d) => celulas[c.id][d] === "trabalha" && !ctx.bloqueados.has(chave(c.id, d)),
       );
       if (opcoes.length > 0) tarefas.push({ colaboradorId: c.id, tipo: "folga", opcoes, atual: null });
     }
@@ -260,13 +359,13 @@ function montarTarefas(ctx: Contexto, celulas: Celulas, avisos: string[]): Taref
   // Domingos de descanso adicionais.
   const domingos = dias.filter((d) => diaDaSemana(d) === 0);
   for (const c of ordem) {
-    // Uma folga semanal travada num domingo também vale como descanso de domingo.
+    // Uma folga semanal travada (ou fixada por regra) num domingo também vale como descanso de domingo.
     const jaTem = domingos.filter(
-      (d) => celulas[c.id][d] === "domingo" || (celulas[c.id][d] === "folga" && ctx.travados.has(chave(c.id, d))),
+      (d) => celulas[c.id][d] === "domingo" || (celulas[c.id][d] === "folga" && ctx.bloqueados.has(chave(c.id, d))),
     ).length;
     const precisa = e.parametros.domingosPorMes - jaTem;
     if (precisa <= 0) continue;
-    const opcoes = domingos.filter((d) => celulas[c.id][d] === "trabalha" && !ctx.travados.has(chave(c.id, d)));
+    const opcoes = domingos.filter((d) => celulas[c.id][d] === "trabalha" && !ctx.bloqueados.has(chave(c.id, d)));
     if (opcoes.length < precisa) {
       avisos.push(`${nomes.get(c.id)}: sem domingo disponível para o descanso do mês.`);
     }
@@ -326,6 +425,26 @@ function otimizar(ctx: Contexto, celulas: Celulas, tarefas: Tarefa[]): void {
   }
 }
 
+/** Depois da otimização: quem dobra passa a aparecer como "Dobra" na célula. */
+function materializarDobras(ctx: Contexto, celulas: Celulas): void {
+  ctx.virtual = false;
+  if (ctx.dobras.length === 0) return;
+  for (const data of ctx.dias) {
+    for (const r of ctx.dobras) {
+      const a = ctx.colab.get(r.cobertoId);
+      const b = ctx.colab.get(r.cobreId);
+      if (!a || !b || a.turno === b.turno) continue;
+      const sa = celulas[a.id][data];
+      if (sa !== "folga" && sa !== "domingo") continue;
+      if (celulas[b.id][data] !== "trabalha" || ctx.bloqueados.has(chave(b.id, data))) continue;
+      const exig = ctx.exigencias(data, a.turno).find((x) => x.funcaoId === a.funcaoPrincipalId);
+      if (!exig) continue;
+      const presentes = presentesPorFuncao(ctx, celulas, data, a.turno).get(exig.funcaoId) ?? 0;
+      if (presentes < exig.ideal) celulas[b.id][data] = "dobra";
+    }
+  }
+}
+
 // ---------------------------------------------------------------- verificações
 
 const LEGAIS_VERIFICADOS = [
@@ -357,7 +476,7 @@ function verificar(ctx: Contexto, celulas: Celulas, avisos: string[]): { conflit
     for (const c of e.colaboradores) {
       let seguidos = 0;
       for (const d of dias) {
-        seguidos = celulas[c.id][d] === "trabalha" ? seguidos + 1 : 0;
+        seguidos = trabalhando(celulas[c.id][d]) ? seguidos + 1 : 0;
         if (seguidos === maxSeguidos + 1) {
           conflitos.push({
             codigo: "dias_consecutivos",
@@ -393,7 +512,7 @@ function verificar(ctx: Contexto, celulas: Celulas, avisos: string[]): { conflit
       for (const c of e.colaboradores) {
         const j = e.jornadas.find((x) => x.turno === c.turno);
         if (!j) continue;
-        const trabalhados = semana.filter((d) => celulas[c.id][d] === "trabalha").length;
+        const trabalhados = semana.filter((d) => trabalhando(celulas[c.id][d])).length;
         if (trabalhados * duracaoEfetivaMin(j) > maxSemanal * 60) {
           conflitos.push({
             codigo: "jornada_semanal",
@@ -412,7 +531,7 @@ function verificar(ctx: Contexto, celulas: Celulas, avisos: string[]): { conflit
     for (const c of e.colaboradores) {
       for (let i = 0; i + periodicidade <= domingos.length; i++) {
         const janela = domingos.slice(i, i + periodicidade);
-        const todosTrabalhados = janela.every((d) => celulas[c.id][d] === "trabalha");
+        const todosTrabalhados = janela.every((d) => trabalhando(celulas[c.id][d]));
         if (todosTrabalhados) {
           conflitos.push({
             codigo: "domingo_periodicidade",
@@ -426,6 +545,8 @@ function verificar(ctx: Contexto, celulas: Celulas, avisos: string[]): { conflit
     }
   }
 
+  verificarDobras(ctx, celulas, conflitos, avisos);
+
   // Trava do gerente fora dos dias de folga preferidos: permitido, mas avisado.
   for (const t of e.travas) {
     if (t.situacao === "folga" && !e.parametros.diasFolgaSemanal.includes(diaDaSemana(t.data))) {
@@ -433,6 +554,74 @@ function verificar(ctx: Contexto, celulas: Celulas, avisos: string[]): { conflit
     }
   }
   return { conflitos, legaisNaoVerificados };
+}
+
+/** Dobras: exceção ao turno fixo. Sempre avisadas; viram conflito quando violam um limite legal validado. */
+function verificarDobras(ctx: Contexto, celulas: Celulas, conflitos: Conflito[], avisos: string[]): void {
+  const { e, dias } = ctx;
+  const maxDiaria = numeroLegal(e, "jornada_maxima_diaria_horas");
+  const minDescanso = numeroLegal(e, "descanso_entre_jornadas_horas");
+  const hm = (min: number) => `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`;
+
+  for (const c of e.colaboradores) {
+    const datas = dias.filter((d) => celulas[c.id][d] === "dobra");
+    if (datas.length === 0) continue;
+    avisos.push(
+      `${c.nome}: ${datas.length} dobra(s) no mês. É uma exceção cadastrada: contraria o turno fixo e a regra de não abrir e fechar no mesmo dia.`,
+    );
+    const propria = e.jornadas.find((j) => j.turno === c.turno);
+    const outra = e.jornadas.find((j) => j.turno !== c.turno);
+    if (!propria || !outra) continue;
+
+    const iniP = horaParaMinutos(propria.horaInicio);
+    const fimP = iniP + duracaoJornadaMin(propria);
+    const iniO = horaParaMinutos(outra.horaInicio);
+    const fimO = iniO + duracaoJornadaMin(outra);
+    const ini = Math.min(iniP, iniO);
+    const fim = Math.max(fimP, fimO);
+    const efetivas = fim - ini - propria.intervaloMinutos - outra.intervaloMinutos;
+
+    if (maxDiaria !== null && efetivas > maxDiaria * 60) {
+      conflitos.push({
+        codigo: "dobra_jornada_diaria",
+        mensagem: `${c.nome}: ${datas.length} dobra(s) com ${hm(efetivas)} de trabalho efetivo no dia, acima de ${maxDiaria}h (primeira em ${datas[0]}).`,
+        colaboradorId: c.id,
+        data: datas[0],
+      });
+    }
+    if (minDescanso !== null) {
+      let menor = Infinity;
+      let quando = datas[0];
+      for (const d of datas) {
+        const ontem = somarDias(d, -1);
+        const amanha = somarDias(d, 1);
+        if (dias.includes(ontem) && trabalhando(celulas[c.id][ontem])) {
+          const fimOntem = celulas[c.id][ontem] === "dobra" ? fim : fimP;
+          const folga = ini - (fimOntem - 1440);
+          if (folga < menor) {
+            menor = folga;
+            quando = d;
+          }
+        }
+        if (dias.includes(amanha) && trabalhando(celulas[c.id][amanha])) {
+          const iniAmanha = celulas[c.id][amanha] === "dobra" ? ini : iniP;
+          const folga = 1440 + iniAmanha - fim;
+          if (folga < menor) {
+            menor = folga;
+            quando = d;
+          }
+        }
+      }
+      if (menor < minDescanso * 60) {
+        conflitos.push({
+          codigo: "dobra_descanso",
+          mensagem: `${c.nome}: descanso de ${hm(menor)} perto de uma dobra, abaixo de ${minDescanso}h (em ${quando}).`,
+          colaboradorId: c.id,
+          data: quando,
+        });
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------- resultado
@@ -452,10 +641,12 @@ function montarResultado(ctx: Contexto, celulas: Celulas, avisosIniciais: string
   }
   let folgas = 0;
   let domingos = 0;
+  const dobrasPorColaborador: Record<string, number> = {};
   for (const c of e.colaboradores) {
     for (const d of dias) {
       if (celulas[c.id][d] === "folga") folgas++;
       if (celulas[c.id][d] === "domingo") domingos++;
+      if (celulas[c.id][d] === "dobra") dobrasPorColaborador[c.id] = (dobrasPorColaborador[c.id] ?? 0) + 1;
     }
   }
   const estados = dias.map((d) => estadoDoDia.get(d) ?? "completa");
@@ -464,6 +655,8 @@ function montarResultado(ctx: Contexto, celulas: Celulas, avisosIniciais: string
     celulas,
     travados: [...ctx.travados],
     feriados: e.feriados.filter((d) => dias.includes(d)),
+    fechados: [...ctx.fechados].filter((d) => dias.includes(d)).sort(),
+    dobrasPorColaborador,
     cobertura,
     conflitos,
     avisos,
@@ -477,6 +670,7 @@ function montarResultado(ctx: Contexto, celulas: Celulas, avisosIniciais: string
       diasComDeficit: estados.filter((s) => s === "deficit").length,
       conflitos: conflitos.length,
       legaisNaoVerificados,
+      dobras: Object.values(dobrasPorColaborador).reduce((a, b) => a + b, 0),
     },
   };
 }
@@ -484,11 +678,13 @@ function montarResultado(ctx: Contexto, celulas: Celulas, avisosIniciais: string
 /** Gera a proposta do mês respeitando ausências e travas. */
 export function gerarEscala(entrada: EntradaMotor): ResultadoMotor {
   const dias = diasDoMes(entrada.ano, entrada.mes);
-  const { celulas, travados } = celulasBase(entrada, dias);
-  const ctx = criarContexto(entrada, travados);
+  const { celulas, travados, fixas } = celulasBase(entrada, dias);
+  const ctx = criarContexto(entrada, travados, fixas);
   const avisos: string[] = [];
   const tarefas = montarTarefas(ctx, celulas, avisos);
+  ctx.virtual = true; // durante a otimização, uma dobra possível já conta na cobertura
   otimizar(ctx, celulas, tarefas);
+  materializarDobras(ctx, celulas);
   return montarResultado(ctx, celulas, avisos);
 }
 
@@ -496,7 +692,7 @@ export function gerarEscala(entrada: EntradaMotor): ResultadoMotor {
 export function avaliarEscala(entrada: EntradaMotor, celulas: Celulas): ResultadoMotor {
   const dias = diasDoMes(entrada.ano, entrada.mes);
   const base = celulasBase(entrada, dias);
-  const ctx = criarContexto(entrada, base.travados);
+  const ctx = criarContexto(entrada, base.travados, base.fixas);
   // Quem entrou depois da geração (ou dias sem registro) é tratado pela situação de base.
   const completas: Celulas = {};
   for (const c of entrada.colaboradores) completas[c.id] = { ...base.celulas[c.id], ...(celulas[c.id] ?? {}) };
