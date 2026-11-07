@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSessao } from "@/components/Sessao";
+import { ehRH } from "@/lib/acesso";
 import { rotuloFuncao, ROTULO_TURNO } from "@/lib/funcoes";
 import {
   funcaoDoCargo,
@@ -37,7 +38,7 @@ export default function Importar() {
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<string | null>(null);
 
-  if (perfil.perfil !== "rh") {
+  if (!ehRH(perfil)) {
     return <p className="cartao">Só o RH pode importar colaboradores.</p>;
   }
 

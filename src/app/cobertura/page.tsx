@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSessao } from "@/components/Sessao";
+import { ehRH } from "@/lib/acesso";
 import { SeletorUnidade, useUnidades } from "@/components/SeletorUnidade";
 import { DIAS_SEMANA } from "@/lib/datas";
 import { ROTULO_TURNO, rotuloFuncao } from "@/lib/funcoes";
@@ -17,7 +18,7 @@ function numeroOuNulo(t: string): number | null {
 
 export default function CoberturaPagina() {
   const { perfil } = useSessao();
-  const podeEditar = perfil.perfil === "rh";
+  const podeEditar = ehRH(perfil);
   const { unidades, unidadeId, setUnidadeId, erro: erroUnidades } = useUnidades();
   const [linhas, setLinhas] = useState<Cobertura[]>([]);
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);

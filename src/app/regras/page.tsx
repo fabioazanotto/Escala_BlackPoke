@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSessao } from "@/components/Sessao";
+import { ehRH } from "@/lib/acesso";
 import { dataBR } from "@/lib/datas";
 import type { Feriado, Parametro, Unidade } from "@/lib/tipos";
 
 export default function Regras() {
   const { perfil } = useSessao();
-  const podeEditar = perfil.perfil === "rh";
+  const podeEditar = ehRH(perfil);
   const [parametros, setParametros] = useState<Parametro[]>([]);
   const [feriados, setFeriados] = useState<Feriado[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);

@@ -5,7 +5,8 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { identidade } from "@/config/identidade";
-import { abasConfiguracoes, destinos, rotasLargas, trilhas } from "@/config/menu";
+import { abaAtiva, abasConfiguracoes, abasRH, destinoInicial, destinos, podeAcessar, rotasLargas, trilhas } from "@/config/menu";
+import { ROTULO_PERFIL } from "@/lib/acesso";
 import { Icone } from "@/components/Icones";
 import { useSessao } from "@/components/Sessao";
 
@@ -42,8 +43,8 @@ function BarraLateral({ aoNavegar }: { aoNavegar?: () => void }) {
         <Marca />
       </div>
       <nav aria-label="Navegação principal" className="flex-1 space-y-1 overflow-y-auto p-3">
-        {destinos.map((d) => {
-          const ativo = d.rotas.some((r) => (r === "/" ? caminho === "/" : caminho === r || caminho.startsWith(r + "/")));
+        {destinos.filter((d) => d.perfis.includes(perfil.perfil)).map((d) => {
+          const ativo = d.rotas.some((r) => caminho === r || caminho.startsWith(r + "/"));
           return (
             <Link
               key={d.href}
@@ -71,7 +72,7 @@ function BarraLateral({ aoNavegar }: { aoNavegar?: () => void }) {
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{perfil.nome}</p>
-            <p className="text-xs text-neutral-600">{perfil.perfil === "rh" ? "RH" : "Gerência"}</p>
+            <p className="text-xs text-neutral-600">{ROTULO_PERFIL[perfil.perfil]}</p>
           </div>
         </div>
         <button className="botao-secundario w-full" onClick={sair}>
@@ -115,7 +116,12 @@ export function Estrutura({ children }: { children: React.ReactNode }) {
 
   const trilha = trilhas[caminho] ?? [];
   const larga = rotasLargas.includes(caminho);
-  const mostrarAbas = abasConfiguracoes.some((a) => a.href === caminho);
+  const abas = abasRH.some((a) => abaAtiva(a.href, caminho))
+    ? { lista: abasRH, rotulo: "RH" }
+    : abasConfiguracoes.some((a) => abaAtiva(a.href, caminho))
+      ? { lista: abasConfiguracoes, rotulo: "Configurações" }
+      : null;
+  const liberado = podeAcessar(perfil.perfil, caminho);
 
   return (
     <div className="min-h-screen lg:pl-[208px]">
@@ -171,10 +177,10 @@ export function Estrutura({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="p-4 lg:p-7">
-        {mostrarAbas && (
-          <nav aria-label="Configurações" className="mb-5 flex gap-1 overflow-x-auto border-b border-neutral-200">
-            {abasConfiguracoes.map((a) => {
-              const ativa = a.href === caminho;
+        {liberado && abas && (
+          <nav aria-label={abas.rotulo} className="mb-5 flex gap-1 overflow-x-auto border-b border-neutral-200">
+            {abas.lista.map((a) => {
+              const ativa = abaAtiva(a.href, caminho);
               return (
                 <Link
                   key={a.href}
@@ -190,7 +196,15 @@ export function Estrutura({ children }: { children: React.ReactNode }) {
             })}
           </nav>
         )}
-        <div className={larga ? "" : "max-w-4xl"}>{children}</div>
+        {liberado ? (
+          <div className={larga ? "" : "max-w-4xl"}>{children}</div>
+        ) : (
+          <div className="cartao max-w-xl space-y-3">
+            <h1 className="text-xl font-semibold">Sem acesso a esta área</h1>
+            <p className="text-neutral-700">O seu perfil ({ROTULO_PERFIL[perfil.perfil]}) não tem permissão para abrir esta tela.</p>
+            <Link href={destinoInicial(perfil.perfil)} className="botao">Voltar ao início</Link>
+          </div>
+        )}
       </main>
     </div>
   );

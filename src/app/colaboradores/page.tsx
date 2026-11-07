@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSessao } from "@/components/Sessao";
+import { ehRH } from "@/lib/acesso";
 import { ROTULO_TURNO, rotuloFuncao } from "@/lib/funcoes";
 import { semAcento } from "@/lib/importacao/colaboradores";
 import type { Colaborador, Funcao, Turno2, Unidade } from "@/lib/tipos";
@@ -31,7 +32,7 @@ const COLUNAS = "id, unidade_id, nome, cargo, matricula, cpf, telefone, funcao_p
 
 export default function Colaboradores() {
   const { perfil } = useSessao();
-  const podeEditar = perfil.perfil === "rh";
+  const podeEditar = ehRH(perfil);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [unidadeId, setUnidadeId] = useState("");
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);

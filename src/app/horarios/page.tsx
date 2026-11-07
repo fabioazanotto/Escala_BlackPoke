@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSessao } from "@/components/Sessao";
+import { ehRH } from "@/lib/acesso";
 import { SeletorUnidade, useUnidades } from "@/components/SeletorUnidade";
 import { DIAS_SEMANA_CURTO, duracaoMinutos, formatarMinutos, horaCurta } from "@/lib/datas";
 import { ROTULO_TURNO } from "@/lib/funcoes";
@@ -10,7 +11,7 @@ import type { Funcionamento, Jornada } from "@/lib/tipos";
 
 export default function Horarios() {
   const { perfil } = useSessao();
-  const podeEditar = perfil.perfil === "rh";
+  const podeEditar = ehRH(perfil);
   const { unidades, unidadeId, setUnidadeId, erro: erroUnidades } = useUnidades();
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [atendimento, setAtendimento] = useState<Funcionamento[]>([]);

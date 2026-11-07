@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSessao } from "@/components/Sessao";
+import { ehRH } from "@/lib/acesso";
 import { SeletorUnidade, useUnidades } from "@/components/SeletorUnidade";
 import { dataBR, hojeISO } from "@/lib/datas";
 import type { Ausencia, TipoAusencia } from "@/lib/tipos";
@@ -19,7 +20,7 @@ const VAZIO: Formulario = { colaboradorId: "", tipo: "ferias", inicio: "", fim: 
 
 export default function Ausencias() {
   const { perfil } = useSessao();
-  const podeEditar = perfil.perfil === "rh";
+  const podeEditar = ehRH(perfil);
   const { unidades, unidadeId, setUnidadeId, erro: erroUnidades } = useUnidades();
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [colaboradores, setColaboradores] = useState<{ id: string; nome: string }[]>([]);

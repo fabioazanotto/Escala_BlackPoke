@@ -54,7 +54,7 @@ export type Unidade = {
   ativa: boolean;
 };
 
-export type PerfilAcesso = "rh" | "gerencia";
+export type PerfilAcesso = "rh" | "gerencia" | "admin";
 
 export type Perfil = {
   id: string;

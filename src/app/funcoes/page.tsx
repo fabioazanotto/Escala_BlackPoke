@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSessao } from "@/components/Sessao";
+import { ehRH } from "@/lib/acesso";
 import { rotuloFuncao } from "@/lib/funcoes";
 import type { Funcao, Unidade } from "@/lib/tipos";
 
 export default function Funcoes() {
   const { perfil } = useSessao();
-  const podeEditar = perfil.perfil === "rh";
+  const podeEditar = ehRH(perfil);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [unidadeId, setUnidadeId] = useState("");
   const [lista, setLista] = useState<Funcao[]>([]);

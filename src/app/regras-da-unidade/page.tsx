@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CabecalhoPagina } from "@/components/CabecalhoPagina";
 import { Icone } from "@/components/Icones";
 import { useSessao } from "@/components/Sessao";
+import { ehRH } from "@/lib/acesso";
 import { SeletorUnidade, useUnidades } from "@/components/SeletorUnidade";
 import { paraData } from "@/lib/datas";
 import {
@@ -45,7 +46,7 @@ const VAZIO: Formulario = {
 
 export default function RegrasDaUnidade() {
   const { perfil } = useSessao();
-  const podeEditar = perfil.perfil === "rh";
+  const podeEditar = ehRH(perfil);
   const { unidades, unidadeId, setUnidadeId, erro: erroUnidades } = useUnidades();
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [linhas, setLinhas] = useState<Linha[]>([]);
