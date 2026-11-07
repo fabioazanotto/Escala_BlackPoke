@@ -18,6 +18,10 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   A área Vendas é só do admin e vai puxar dados do Xmenu (somente leitura; tokens por loja ficam nas variáveis da Vercel, nunca no código).
   Integração Xmenu (somente leitura, no servidor): `src/lib/integracoes/xmenu.ts`; lojas em `src/config/lojas.ts`; notas da API em `docs/xmenu-api.md`.
   Rota de diagnóstico `/api/xmenu/diagnostico` (só admin) e botão "Testar conexão" em Vendas.
+  Banco de vendas (`supabase/escala/09_vendas.sql`): só totais por loja, dia de caixa, turno e canal (`vendas_resumo`), sem dado de cliente; só o admin lê.
+  Sincronização: `src/lib/vendas/sincronizar.ts` (lógica, testada) + `src/lib/servidor/sincronizarVendas.ts` (liga ao Xmenu e ao banco) + rota
+  `POST /api/vendas/sincronizar` (admin logado ou cabeçalho `x-sincronizar-segredo` vindo do agendador do banco). Reescreve os últimos 3 dias a cada rodada.
+  Variáveis na Vercel (Secret): `SUPABASE_SERVICE_ROLE_KEY` e `SINCRONIZAR_SEGREDO`. A chave de serviço só é usada em `src/lib/servidor/supabaseAdmin.ts`.
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
   tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
   Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).

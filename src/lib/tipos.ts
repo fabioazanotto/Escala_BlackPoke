@@ -164,7 +164,8 @@ export type VendaResumida = {
   retirada: boolean;
   cancelada: boolean;
   bruto: number; // itens
-  desconto: number;
+  desconto: number; // desconto total da venda
+  descontoFuncionarios: number; // parte do desconto que é consumo de funcionário (ex.: "30% FUNCIONARIOS")
   taxaEntrega: number;
   liquido: number; // total líquido da venda
 };

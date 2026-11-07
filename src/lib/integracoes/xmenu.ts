@@ -188,6 +188,15 @@ export function classificarCanal(venda: Bruto): CanalVenda {
 
 const PERIODOS: Record<string, PeriodoCaixa> = { morning: "manha", afternoon: "tarde", night: "noite" };
 
+/** Desconto de consumo de funcionário: identificado pelo nome do desconto cadastrado no Xmenu. */
+export function ehDescontoDeFuncionario(nome: unknown): boolean {
+  return String(nome ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .includes("funcionario");
+}
+
 export function paraVendaResumida(lojaChave: string, venda: Bruto): VendaResumida {
   const cashDate = String(venda?.register?.cashDate ?? "");
   const t = venda?.totals ?? {};
@@ -203,6 +212,7 @@ export function paraVendaResumida(lojaChave: string, venda: Bruto): VendaResumid
     cancelada: venda?.header?.cancelled === true,
     bruto: num(t.itemsGross),
     desconto: num(t.discountValue),
+    descontoFuncionarios: ehDescontoDeFuncionario(venda?.discount?.discountName) ? num(venda?.discount?.value ?? t.discountValue) : 0,
     taxaEntrega: num(t.deliveryFee),
     liquido: num(t.totalNet),
   };

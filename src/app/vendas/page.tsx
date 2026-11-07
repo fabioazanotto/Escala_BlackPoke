@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CabecalhoPagina } from "@/components/CabecalhoPagina";
 import { Icone } from "@/components/Icones";
+import { SincronizacaoVendas } from "@/components/vendas/SincronizacaoVendas";
 import { supabase } from "@/lib/supabase";
 
 type Teste = { nome: string; ok: boolean; status?: number; tempoMs: number; mensagem: string };
@@ -37,6 +38,8 @@ export default function Vendas() {
   return (
     <div>
       <CabecalhoPagina titulo="Vendas" descricao="Vendas das lojas, vindas do Xmenu, em um só lugar." />
+
+      <SincronizacaoVendas />
 
       <section className="cartao mb-4 max-w-3xl space-y-3">
         <h2 className="text-lg font-semibold">Conexão com o Xmenu</h2>
