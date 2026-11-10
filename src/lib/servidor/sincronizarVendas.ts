@@ -5,6 +5,9 @@ import { buscarVendasCaixaFechado, limitesDoDiaDeCaixa, tokenDaLoja } from "@/li
 import { hojeNoBrasil } from "@/lib/vendas/datas";
 import type { Ambiente } from "@/lib/vendas/sincronizar";
 
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const PAUSA_ENTRE_CONSULTAS_MS = 300; // o Xmenu limita chamadas: vamos com calma
+
 export function ambienteReal(db: SupabaseClient): Ambiente {
   const idDaLoja = new Map<string, string>();
 
@@ -20,7 +23,11 @@ export function ambienteReal(db: SupabaseClient): Ambiente {
   return {
     hoje: () => hojeNoBrasil(),
     tokenConfigurado: (loja) => tokenDaLoja(loja) !== null,
-    buscarVendas: (loja, dia) => buscarVendasCaixaFechado(loja, { ...limitesDoDiaDeCaixa(dia), incluirCanceladas: true }),
+    buscarVendas: async (loja, dia) => {
+      await dormir(PAUSA_ENTRE_CONSULTAS_MS);
+      // Mais tentativas e espera maior que o padrão, para atravessar o limite de chamadas do Xmenu.
+      return buscarVendasCaixaFechado(loja, { ...limitesDoDiaDeCaixa(dia), incluirCanceladas: true }, { tentativas: 5, esperaMs: 1500 });
+    },
     gravarDia: async (loja, dia, linhas) => {
       const { error } = await db.rpc("substituir_vendas_dia", {
         p_loja_id: await lojaId(loja.chave),

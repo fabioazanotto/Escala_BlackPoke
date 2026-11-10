@@ -29,13 +29,31 @@ async function chamar(corpo: object): Promise<ResultadoLoja[]> {
   return json.lojas ?? [];
 }
 
-/** Tenta de novo uma vez: o que já foi gravado não se perde, pois cada dia é regravado por inteiro. */
-async function chamarComRetentativa(corpo: object): Promise<ResultadoLoja[]> {
-  try {
-    return await chamar(corpo);
-  } catch {
-    return chamar(corpo);
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const TENTATIVAS_POR_BLOCO = 4;
+const ESPERA_ENTRE_TENTATIVAS_MS = 20000;
+
+/**
+ * Pede um bloco de uma loja e, se o Xmenu mandar esperar (ou o servidor demorar), aguarda e tenta de novo.
+ * Repetir é seguro: cada dia é regravado por inteiro.
+ */
+async function blocoComRetentativa(corpo: object, aoEsperar: () => void): Promise<ResultadoLoja> {
+  let ultimo: ResultadoLoja | Error | null = null;
+  for (let t = 1; t <= TENTATIVAS_POR_BLOCO; t++) {
+    try {
+      const [r] = await chamar(corpo);
+      if (r.status !== "erro") return r;
+      ultimo = r;
+    } catch (e) {
+      ultimo = e as Error;
+    }
+    if (t < TENTATIVAS_POR_BLOCO) {
+      aoEsperar();
+      await dormir(ESPERA_ENTRE_TENTATIVAS_MS);
+    }
   }
+  if (ultimo instanceof Error) throw ultimo;
+  return ultimo as ResultadoLoja;
 }
 
 export function SincronizacaoVendas() {
@@ -89,37 +107,41 @@ export function SincronizacaoVendas() {
         const fim = somarDiasData(de, DIAS_POR_PEDIDO - 1);
         blocos.push({ de, ate: fim > hoje ? hoje : fim });
       }
-      const feitos = new Map<string, number>(); // blocos concluídos por loja
-      const mostrar = () =>
-        setProgresso(
-          LOJAS_XMENU.map((l) => `${l.nome.replace("BlackPoke ", "")} ${Math.round(((feitos.get(l.chave) ?? 0) / blocos.length) * 100)}%`).join(" · "),
-        );
-      mostrar();
+      let feitos = 0;
+      const total = blocos.length * LOJAS_XMENU.length;
+      const mostrar = (loja: string, aviso = "") =>
+        setProgresso(`${Math.round((feitos / total) * 100)}% · ${loja}${aviso}`);
 
-      // Lojas em paralelo (cada uma com seu próprio limite de tempo); blocos em sequência dentro de cada loja.
-      return Promise.all(
-        LOJAS_XMENU.map(async (loja): Promise<ResultadoLoja> => {
-          let dias = 0;
-          for (const b of blocos) {
-            try {
-              const [r] = await chamarComRetentativa({ dataDe: b.de, dataAte: b.ate, lojas: [loja.chave] });
-              if (r.status !== "ok") return { ...r, diasGravados: dias + r.diasGravados };
-              dias += r.diasGravados;
-            } catch (e) {
-              return {
-                chave: loja.chave,
-                nome: loja.nome,
-                status: "erro",
-                diasGravados: dias,
-                mensagem: `${(e as Error).message} Parou em ${b.de.split("-").reverse().join("/")}.`,
-              };
+      // Uma loja por vez, bloco por bloco: o Xmenu limita as chamadas e não gostou do modo paralelo.
+      const resultados: ResultadoLoja[] = [];
+      for (const loja of LOJAS_XMENU) {
+        let dias = 0;
+        let blocosFeitos = 0;
+        let falha: ResultadoLoja | null = null;
+        mostrar(loja.nome);
+        for (const b of blocos) {
+          try {
+            const r = await blocoComRetentativa({ dataDe: b.de, dataAte: b.ate, lojas: [loja.chave] }, () =>
+              mostrar(loja.nome, " — o Xmenu pediu uma pausa, aguardando 20 s…"),
+            );
+            if (r.status !== "ok") {
+              falha = { ...r, diasGravados: dias + r.diasGravados, mensagem: `${r.mensagem ?? "Falhou."} Parou em ${b.de.split("-").reverse().join("/")}.` };
+              break;
             }
-            feitos.set(loja.chave, (feitos.get(loja.chave) ?? 0) + 1);
-            mostrar();
+            dias += r.diasGravados;
+          } catch (e) {
+            falha = { chave: loja.chave, nome: loja.nome, status: "erro", diasGravados: dias, mensagem: `${(e as Error).message} Parou em ${b.de.split("-").reverse().join("/")}.` };
+            break;
           }
-          return { chave: loja.chave, nome: loja.nome, status: "ok", diasGravados: dias };
-        }),
-      );
+          feitos += 1;
+          blocosFeitos += 1;
+          mostrar(loja.nome);
+        }
+        // Se a loja parou no meio, os blocos que faltam contam como passados para a porcentagem não travar.
+        if (falha) feitos += blocos.length - blocosFeitos;
+        resultados.push(falha ?? { chave: loja.chave, nome: loja.nome, status: "ok", diasGravados: dias });
+      }
+      return resultados;
     });
 
   return (
