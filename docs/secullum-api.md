@@ -92,8 +92,13 @@ Só nomes de campos e contagens; sem dados pessoais, IDs de banco ou CNPJs.
   **FuncionariosAfastamentos** (0 nos últimos 30 dias; campos a ver quando houver registros).
 - **Tempo de resposta:** cada consulta levou menos de 1 segundo.
 
+- **Calcular (consulta de um dia, verificado):** funciona com a conta da integração mesmo com "Não permitir alterações de registros de ponto e cálculos" marcado.
+  Colunas devolvidas (27): `Data, Entrada 1..3, Saída 1..3, Normais, Faltas, Extras, DSR, DSR.Deb, Not., ExNot, Ajuste, Abono2, Abono3, Abono4, Atras., Adian., Folga,
+  Carga, JustPa., T+/-, ExInt, Not.Tot., Refeição`. Resposta: `{ Colunas[], Linhas[{ Key, Value[] }], Totais[] }`, uma linha por dia, valores em texto (`HH:mm`).
+  Uso: reconciliar o nosso cálculo com o oficial (Normais, Faltas, Extras, Atrasos, Adiantamentos, Noturno, Carga, Folga). Lembrete: 100 chamadas por hora por banco, um funcionário por chamada.
+- **Funcionários só das empresas liberadas:** com a restrição por empresas no usuário, `Funcionarios` também só devolveu funcionários das empresas incluídas (0 de fora).
+
 ## Pontos ainda abertos
-- Formato de `Calcular` e se a opção "Não permitir alterações" do usuário o bloqueia (testar na Fase 2).
 - Validade do token e limites além do `Calcular`.
 - `GET /Pendencias` do manual não existe no Swagger.
 - Significado de `Origem = 16` e de `Tipo = 3` em detalhe (ver com o suporte Secullum se for relevante).
