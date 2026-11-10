@@ -3,20 +3,26 @@
 Sem dados pessoais nem segredos: este arquivo está num repositório público.
 Nada deste plano foi implementado. Estado: **auditoria concluída; aguardando respostas e aprovação.**
 
-## 1. O que foi (e não foi) possível verificar sobre a API do Secullum
+## 1. Verificação da API do Secullum (atualizada)
 
-- Não há documentação pública da API de integração externa. A busca na web só achou material genérico.
-- O servidor `pontowebintegracaoexterna.secullum.com.br` não é alcançável daqui (rede restrita do ambiente
-  de desenvolvimento), igual ao Xmenu. Só o site publicado na Vercel conseguirá chamá-lo.
-- Os endereços, cabeçalhos e campos do prompt (`/Token`, `client_id=3`, `/Funcionarios`, `/Batidas`,
-  `secullumidbancoselecionado`, `Entrada1..5`, `Saida1..5`) **ficam como hipótese não verificada**.
-- O "documento original" citado no prompt não está no projeto. Preciso dele (PDF ou Swagger) para escrever o
-  adaptador sem inventar campos.
-- A `docs/api-ponto.md` atual descreve uma API **fictícia de demonstração** (Vila Tempero), não o Secullum.
-  Ela será substituída; as variáveis `PONTO_*` dela não serão usadas.
-- Plano de verificação: criar uma rota de diagnóstico só para admin (como a do Xmenu) que roda na Vercel,
-  autentica, lista os bancos acessíveis e devolve **somente a estrutura** (nomes de campos, contagens,
-  códigos de erro), nunca nomes, CPFs ou horários. Com isso o contrato real fica documentado antes do parser.
+O manual oficial e o Swagger foram lidos; o contrato verificado está em `docs/secullum-api.md`.
+- Autenticação: `POST autenticador.secullum.com.br/Token` com `client_id=3`, como no prompt; token por Bearer e banco no
+  cabeçalho `secullumidbancoselecionado`. Os endereços do prompt estavam certos; os nomes de campos de `Batidas` **não** estão no manual.
+- **Achado importante:** `GET /FonteDados/APartirDoId` entrega **cada batida individual** (Data, Hora, Tipo, Origem,
+  DataInclusao, EquipamentoId) por ID crescente, até 5.000 por chamada. É a base mais confiável da sincronização
+  incremental, melhor que depender do formato agrupado de `/Batidas`, cujo corpo não é documentado.
+- `Funcionarios` + `Horarios` dão a jornada prevista por dia da semana (Entrada1..5/Saida1..5, TipoDia, Carga, tolerâncias).
+- `POST /Calcular` é só consulta e devolve os cálculos oficiais; limite de 1 mês e **100 chamadas por hora por banco**.
+- Funcionários exigem autorização LGPD do administrador do Secullum; a conta da integração precisa estar marcada em
+  Manutenções > Integração com Sistemas.
+- Validade do token e período máximo de `/Batidas` não estão documentados.
+- Rede: a API só é alcançável pelo site na Vercel. Por isso a Fase 1 começa por uma rota de diagnóstico (só admin) que devolve só a
+  estrutura da resposta, sem nomes, CPFs ou horários.
+
+**Estrutura do Secullum da BlackPoke (levantada pela tela):** 1 banco, 5 empresas (CNPJs distintos), 9 departamentos
+(funções como Cozinha e Salão, não lojas), 4 equipamentos (aplicativos Checkin e Ponto Virtual, sem relógio físico),
+45 funcionários ativos e 77 desligados. Cada loja é uma **empresa** dentro do mesmo banco. (IDs e CNPJs ficam fora deste
+arquivo por ser público; entram só na tabela de configuração.)
 
 ## 2. Diagnóstico do projeto existente
 
@@ -129,7 +135,7 @@ Cada fase termina em entrega pequena, verificável e reversível. Só avança co
 ### Fase 2 — Integração
 - **Objetivo:** ler funcionários e marcações e guardar com versão.
 - **Arquivos:** `src/lib/ponto/parser.ts`, `src/lib/servidor/sincronizarPonto.ts`, `src/app/api/ponto/sincronizar/route.ts`, agendador.
-- **Alterações:** parser (HH, FOLGA/FALTA, até 5 pares, virada de meia-noite, duplicidade); `ponto_marcacoes` e histórico;
+- **Alterações:** sincronização incremental por `FonteDados/APartirDoId` (cursor por banco) e reprocesso de dias recentes; parser (HH, FOLGA/FALTA, até 5 pares, virada de meia-noite, duplicidade); `ponto_marcacoes` e histórico;
   conferência de funcionários (nos dois, só em um, divergências, duplicidades, inativos); sincronização inicial, incremental e reprocesso de dias recentes; trava de concorrência.
 - **Dependências:** Fase 1; limites reais da API.
 - **Riscos:** paginação e limites desconhecidos; mudança retroativa; fusos e virada de dia.
@@ -185,11 +191,14 @@ Cada fase termina em entrega pequena, verificável e reversível. Só avança co
 - Exemplo de jornada informado para teste (turno do dia): entrada 09:00, saída para intervalo 15:00, retorno 16:00,
   fim 17:20 (6h00 + 1h20 = 7h20, intervalo 1h00, sem horas noturnas).
 
-**Ainda abertas (dependem do Secullum)**
-1. Quantos bancos/empresas existem e quais lojas usam cada um.
-2. Se há um usuário de API com acesso a todos os bancos ou um por banco.
-3. O documento da API (PDF ou Swagger).
-4. Batidas do caso noturno da seção 8 (usaremos a variante B se nada for dito).
+**Respondidas pelo levantamento no Secullum**
+- Há 1 banco e 5 empresas; cada loja é uma empresa. Não existe usuário de API: a integração usa uma Conta Secullum comum, autorizada no banco.
+- Documentação oficial obtida (manual + Swagger).
+
+**Ainda abertas**
+1. Confirmar qual empresa (CNPJ) corresponde a cada unidade/loja do app (a leitura pelos nomes é só uma suposição).
+2. Qual Conta Secullum será usada (sugestão: criar uma conta própria para o BlackPoke e autorizá-la, em vez de usar a de uma pessoa).
+3. Batidas do caso noturno da seção 8 (usaremos a variante B se nada for dito).
 
 ## 8. Caso de teste obrigatório: inconsistência encontrada
 
