@@ -141,6 +141,17 @@ export async function diagnosticar(hoje: string, ontem: string, dependencias: Pa
     };
   });
 
+  // Consulta de cálculos oficiais (POST que só lê): confirma que a conta pode consultar e mostra os NOMES das colunas.
+  // Nenhum valor do cálculo sai daqui. Usa uma chamada das 100 por hora que o Secullum permite por banco.
+  await etapa("Cálculos oficiais (consulta de um dia)", async () => {
+    const alvo = (funcionarios ?? []).find((f) => !valorDoCampo(f, "Demissao") && String(valorDoCampo(f, "Cpf") ?? "").replace(/\D/g, "").length === 11 && idsVisiveis.has(String(valorDoCampo(f, "EmpresaId"))));
+    if (!alvo) throw new ErroSecullum("REQUISICAO_INVALIDA", "Não encontrei um funcionário ativo com CPF para testar.");
+    const r = (await s.chamar("POST", "Calcular", {}, { FuncionarioCpf: String(valorDoCampo(alvo, "Cpf")), DataInicial: ontem, DataFinal: ontem })) as unknown;
+    const colunas = lista(valorDoCampo(r, "Colunas")).map((c) => String(c));
+    const linhas = lista(valorDoCampo(r, "Linhas"));
+    return { valor: true, mensagem: `Funciona: ${colunas.length} coluna(s) e ${linhas.length} linha(s) para o dia.`, detalhes: { colunas } };
+  });
+
   await etapa("Horários", async () => {
     const h = lista(await s.obter("Horarios"));
     const dias = h.flatMap((x) => lista(valorDoCampo(x, "Dias")));

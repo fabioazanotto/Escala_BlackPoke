@@ -20,6 +20,7 @@ function servidor(opts: { bancoAceitaId?: boolean; bancos?: unknown[] } = {}) {
       { Nome: "Beltrano Secreto", Cpf: "77777777777", EmpresaId: 20, Demissao: null },
       { Nome: "Outro Secreto", Cpf: "66666666666", EmpresaId: 99, Demissao: null },
     ]);
+    if (url.includes("/Calcular")) return json({ Colunas: ["Data", "Normais", "Faltas"], Linhas: [{ Key: "2026-11-09T00:00:00", Value: ["09/11/2026 – Seg", "07:20", "00:00"] }], Totais: ["", "07:20", "00:00"] });
     if (url.includes("/Horarios")) return json([{ Numero: 1, Dias: [{ DiaSemana: 0, Entrada1: "09:00" }] }]);
     if (url.includes("/Funcoes")) return json([{ Descricao: "Cozinheiro" }]);
     if (url.includes("/Justificativas")) return json([{ NomeAbreviado: "ATEST" }]);
@@ -44,13 +45,16 @@ describe("diagnóstico", () => {
     ]);
     expect(d.funcionariosSemEmpresaVisivel).toBe(1);
     expect(d.etapas.map((e) => e.nome)).toContain("Leitura incremental (a partir de um ID)");
+    const calculo = d.etapas.find((e) => e.nome.startsWith("Cálculos oficiais"));
+    expect(calculo?.ok).toBe(true);
+    expect(calculo?.detalhes).toEqual({ colunas: ["Data", "Normais", "Faltas"] });
   });
 
   it("não vaza dados pessoais, senha nem horários de batida", async () => {
     const f = servidor();
     const d = await diagnosticar("2026-11-10", "2026-11-09", { env, fetchFn: f as unknown as typeof fetch, esperaMs: 1 });
     const texto = JSON.stringify(d);
-    for (const proibido of ["Secreto", "99999999999", "88888888888", "66666666666", env.SECULLUM_SENHA, env.SECULLUM_USUARIO, "texto livre pessoal", "09:02", "17:00", "TOK"]) {
+    for (const proibido of ["Secreto", "99999999999", "88888888888", "66666666666", env.SECULLUM_SENHA, env.SECULLUM_USUARIO, "texto livre pessoal", "09:02", "17:00", "TOK", "07:20", "09/11/2026"]) {
       expect(texto).not.toContain(proibido);
     }
   });
