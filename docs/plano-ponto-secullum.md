@@ -201,10 +201,17 @@ Cada fase termina em entrega pequena, verificável e reversível. Só avança co
   antes de gravar (minimização de dados, LGPD). Só as empresas explicitamente vinculadas a uma unidade são lidas.
 - A integração usará uma **Conta Secullum própria do BlackPoke** (não a de uma pessoa), com credenciais só na Vercel (Secret).
 
+**Levantado no Secullum (conta da integração)**
+- A autorização LGPD é **por usuário**: Manutenções > Usuários > Cadastro > abrir o usuário > "Permitir a visualização e edição de dados protegidos pela LGPD". Não existe por banco nem por perfil.
+- No mesmo formulário: "Não permitir alterações de registros de ponto e cálculos" (será marcado na conta da integração, como proteção extra de somente leitura)
+  e "Restrições por empresas" (será usado para limitar a conta às empresas incluídas no projeto; o filtro no código continua como segunda barreira).
+- Existe o campo "Termo Aceito em": pode ser preciso entrar uma vez no Ponto Web com a conta para aceitar o termo da LGPD (a confirmar).
+- Ainda **não confirmado** se o tipo "Usuário" (em vez de Administrador) pode receber a autorização LGPD: começar por "Usuário" e subir só se a API recusar.
+- A conta da integração marcada em "Integração com Sistemas" é o que libera a conexão; a marcação LGPD do mesmo usuário provavelmente libera os dados protegidos (a confirmar no diagnóstico).
+
 **Ainda abertas**
-1. Onde fica, na tela do Secullum, a autorização LGPD de dados protegidos para a conta da integração (a conferir).
-2. Tipo de permissão mínimo que a conta precisa (começar por "Usuário"; só subir para "Administrador" se a API recusar).
-3. Batidas do caso noturno da seção 8 (usaremos a variante B se nada for dito).
+1. Se "Não permitir alterações..." bloqueia também a consulta `Calcular` (testar no diagnóstico; se bloquear, desmarcar).
+2. Batidas do caso noturno da seção 8 (usaremos a variante B se nada for dito).
 
 ## 8. Caso de teste obrigatório: inconsistência encontrada
 
