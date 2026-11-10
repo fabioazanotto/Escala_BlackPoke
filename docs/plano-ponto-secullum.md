@@ -195,9 +195,15 @@ Cada fase termina em entrega pequena, verificável e reversível. Só avança co
 - Há 1 banco e 5 empresas; cada loja é uma empresa. Não existe usuário de API: a integração usa uma Conta Secullum comum, autorizada no banco.
 - Documentação oficial obtida (manual + Swagger).
 
+**Decidido pelo dono**
+- Mapeamento confirmado: cada loja do app corresponde a uma empresa do Secullum (identificadas por CNPJ na tabela de configuração, não neste arquivo).
+- **Uma das 5 empresas do banco fica fora do projeto.** O adaptador filtra por empresa e descarta os funcionários e marcações dela
+  antes de gravar (minimização de dados, LGPD). Só as empresas explicitamente vinculadas a uma unidade são lidas.
+- A integração usará uma **Conta Secullum própria do BlackPoke** (não a de uma pessoa), com credenciais só na Vercel (Secret).
+
 **Ainda abertas**
-1. Confirmar qual empresa (CNPJ) corresponde a cada unidade/loja do app (a leitura pelos nomes é só uma suposição).
-2. Qual Conta Secullum será usada (sugestão: criar uma conta própria para o BlackPoke e autorizá-la, em vez de usar a de uma pessoa).
+1. Onde fica, na tela do Secullum, a autorização LGPD de dados protegidos para a conta da integração (a conferir).
+2. Tipo de permissão mínimo que a conta precisa (começar por "Usuário"; só subir para "Administrador" se a API recusar).
 3. Batidas do caso noturno da seção 8 (usaremos a variante B se nada for dito).
 
 ## 8. Caso de teste obrigatório: inconsistência encontrada
