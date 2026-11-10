@@ -110,13 +110,13 @@ export default function Vendas() {
       {!erroTela && !carregando && lojas && (
         <div className="space-y-4">
           <IndicadoresVendas atual={totais} anterior={totaisAnt} rotuloComparacao={anterior.rotulo} />
+          <TabelaLojas linhas={linhas} lojas={lojasEscolhidas} />
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="min-w-0 lg:col-span-2">
               <GraficoVendas linhas={linhas} de={periodo.de} ate={periodo.ate} lojas={lojasEscolhidas} canais={canaisSel} />
             </div>
             <ParticipacaoCanais porCanal={porCanal} />
           </div>
-          <TabelaLojas linhas={linhas} lojas={lojasEscolhidas} />
         </div>
       )}
 
