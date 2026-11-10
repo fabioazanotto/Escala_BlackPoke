@@ -24,3 +24,13 @@ export async function chamadorDaRequisicao(request: Request): Promise<Chamador> 
   if (!perfil || !perfil.ativo) return null;
   return { usuarioId: usuario.user.id, perfil: perfil.perfil as PerfilAcesso };
 }
+
+/** Cliente do Supabase que age COMO o usuário que chamou (as regras de acesso do banco continuam valendo). */
+export function clienteDoChamador(request: Request) {
+  const cab = request.headers.get("authorization") ?? "";
+  const jwt = cab.toLowerCase().startsWith("bearer ") ? cab.slice(7).trim() : "";
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const chave = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!jwt || !url || !chave) return null;
+  return createClient(url, chave, { global: { headers: { Authorization: `Bearer ${jwt}` } }, auth: { persistSession: false, autoRefreshToken: false } });
+}

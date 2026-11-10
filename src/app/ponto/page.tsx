@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CabecalhoPagina } from "@/components/CabecalhoPagina";
 import { Icone } from "@/components/Icones";
+import { ConferenciaFuncionarios } from "@/components/ponto/ConferenciaFuncionarios";
 import { useSessao } from "@/components/Sessao";
 import { ehAdmin } from "@/lib/acesso";
 import { supabase } from "@/lib/supabase";
@@ -64,6 +65,8 @@ export default function Ponto() {
           <p className="text-neutral-700">A integração com o Secullum está em preparação e, por enquanto, só administradores têm acesso.</p>
         </section>
       ) : (
+        <div className="space-y-4">
+        <ConferenciaFuncionarios />
         <section className="cartao max-w-3xl space-y-3">
           <h2 className="text-lg font-semibold">Conexão com o Secullum</h2>
           <p className="text-neutral-700">
@@ -137,6 +140,7 @@ export default function Ponto() {
             </div>
           )}
         </section>
+        </div>
       )}
     </div>
   );
