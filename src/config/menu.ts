@@ -12,12 +12,15 @@ export type NomeIcone =
   | "ausencias"
   | "cobertura";
 
+export type SubItem = { rotulo: string; href: string; exato?: boolean }; // exato: só fica marcado nesse caminho (não nos filhos)
+
 export type Destino = {
   rotulo: string;
   href: string;
   icone: NomeIcone;
   rotas: string[]; // rotas que mantêm este destino marcado como ativo
   perfis: PerfilAcesso[]; // quem enxerga e pode abrir este destino
+  subitens?: SubItem[]; // aparecem recuados embaixo do destino, na barra lateral
 };
 
 export const destinos: Destino[] = [
@@ -28,6 +31,16 @@ export const destinos: Destino[] = [
     icone: "rh",
     rotas: ["/rh", "/escala-mensal", "/colaboradores", "/ausencias", "/cobertura", "/ponto", "/ponto-integracao"],
     perfis: ["rh", "gerencia", "admin"],
+    subitens: [
+      { rotulo: "Visão geral", href: "/rh" },
+      { rotulo: "Escala do mês", href: "/escala-mensal" },
+      { rotulo: "Colaboradores", href: "/colaboradores" },
+      { rotulo: "Ausências", href: "/ausencias" },
+      { rotulo: "Cobertura", href: "/cobertura" },
+      { rotulo: "Ponto ao vivo", href: "/ponto", exato: true },
+      { rotulo: "Ponto por colaborador", href: "/ponto/colaborador" },
+      { rotulo: "Integração do ponto", href: "/ponto-integracao" },
+    ],
   },
   {
     rotulo: "Configurações",
@@ -36,17 +49,6 @@ export const destinos: Destino[] = [
     rotas: ["/unidades", "/funcoes", "/horarios", "/regras", "/regras-da-unidade"],
     perfis: ["rh", "gerencia", "admin"],
   },
-];
-
-// Abas dentro do RH.
-export const abasRH: { rotulo: string; href: string }[] = [
-  { rotulo: "Visão geral", href: "/rh" },
-  { rotulo: "Escala do mês", href: "/escala-mensal" },
-  { rotulo: "Colaboradores", href: "/colaboradores" },
-  { rotulo: "Ausências", href: "/ausencias" },
-  { rotulo: "Cobertura", href: "/cobertura" },
-  { rotulo: "Ponto", href: "/ponto" },
-  { rotulo: "Integração do ponto", href: "/ponto-integracao" },
 ];
 
 // Abas dentro de Configurações.
@@ -67,7 +69,8 @@ export const trilhas: Record<string, string[]> = {
   "/colaboradores/importar": ["RH", "Colaboradores", "Importar planilha"],
   "/ausencias": ["RH", "Ausências"],
   "/cobertura": ["RH", "Cobertura"],
-  "/ponto": ["RH", "Ponto"],
+  "/ponto": ["RH", "Ponto ao vivo"],
+  "/ponto/colaborador": ["RH", "Ponto por colaborador"],
   "/ponto-integracao": ["RH", "Integração do ponto"],
   "/unidades": ["Configurações", "Unidades"],
   "/funcoes": ["Configurações", "Funções"],
@@ -77,7 +80,7 @@ export const trilhas: Record<string, string[]> = {
 };
 
 // Telas que usam a largura toda da área útil. As demais ficam numa coluna mais estreita.
-export const rotasLargas = ["/vendas", "/rh", "/escala-mensal"];
+export const rotasLargas = ["/vendas", "/rh", "/escala-mensal", "/ponto", "/ponto/colaborador", "/ponto-integracao"];
 
 const combina = (rota: string, caminho: string) => caminho === rota || caminho.startsWith(rota + "/");
 

@@ -7,6 +7,7 @@ import { valorDoCampo } from "@/lib/integracoes/secullum";
 import { ROTULO_SITUACAO, ORDEM_SITUACAO, agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, jornadaDe, type Avaliacao, type Jornada } from "@/lib/ponto/aoVivo";
 import type { LojaAoVivo, PainelAoVivo, PessoaAoVivo } from "@/lib/ponto/aoVivoTipos";
 import { somarDiasData } from "@/lib/vendas/datas";
+import { comCache, reiniciarCache } from "./cacheCurto";
 import { carregarContexto, traduzirFuncionarios, type ContextoPonto } from "./pontoDados";
 
 const lista = (x: unknown) => (Array.isArray(x) ? x : []);
@@ -14,26 +15,15 @@ const texto = (x: unknown) => (typeof x === "string" ? x : "");
 const digitos = (s: string) => s.replace(/\D/g, "");
 const HORA = /^\d{1,2}[:.]\d{2}/;
 
-// ---------------------------------------------------------------- cache curto (vale por instância do servidor)
-
-const cache = new Map<string, { valor: unknown; expira: number }>();
-async function comCache<T>(chave: string, ttlMs: number, f: () => Promise<T>): Promise<T> {
-  const c = cache.get(chave);
-  if (c && c.expira > Date.now()) return c.valor as T;
-  const valor = await f();
-  cache.set(chave, { valor, expira: Date.now() + ttlMs });
-  return valor;
-}
-
 /** Só para testes: esvazia o cache curto. */
-export const reiniciarCacheAoVivo = () => cache.clear();
+export const reiniciarCacheAoVivo = reiniciarCache;
 
 // ---------------------------------------------------------------- horário previsto no Secullum
 
 /** DiaSemana do Secullum: segunda = 0 ... domingo = 6. */
 const diaSemanaSecullum = (dia: string) => (new Date(`${dia}T00:00:00Z`).getUTCDay() + 6) % 7;
 
-function jornadaDoHorario(horario: unknown, dia: string): { jornada: Jornada | null; folga: boolean; texto: string | null } {
+export function jornadaDoHorario(horario: unknown, dia: string): { jornada: Jornada | null; folga: boolean; texto: string | null } {
   const dow = diaSemanaSecullum(dia);
   const d = lista(valorDoCampo(horario, "Dias")).find((x) => Number(valorDoCampo(x, "DiaSemana")) === dow);
   if (!d) return { jornada: null, folga: false, texto: null };
@@ -146,7 +136,7 @@ export async function montarAoVivo(db: SupabaseClient, agora = agoraNoBrasil()):
     const loja = lojaDaEmpresa.get(f.empresaId) ?? null;
     const colab = colabDoFuncionario.get(f.id);
     const pessoa: PessoaAoVivo = {
-      chave: `f${f.id}`, nome: f.nome, loja, previsto: previsto.texto, fontePrevisto: previsto.texto ? "secullum" : null, ...mostrar(b), avaliacao: av, rotulo: rotuloDe(av),
+      chave: `f${f.id}`, funcionarioId: f.id, nome: f.nome, loja, previsto: previsto.texto, fontePrevisto: previsto.texto ? "secullum" : null, ...mostrar(b), avaliacao: av, rotulo: rotuloDe(av),
       escalaSituacao: colab ? (situacaoEscala.get(colab) ?? null) : null, foraDaEscala: false, semVinculo: !colab, unidade: null,
     };
     pontoPorLoja.set(loja, [...(pontoPorLoja.get(loja) ?? []), pessoa]);
@@ -176,7 +166,7 @@ export async function montarAoVivo(db: SupabaseClient, agora = agoraNoBrasil()):
 
     if (!f) {
       const av: Avaliacao = { situacao: "sem_batida", atrasoMin: null, minutosSemRegistro: null, minutosNoIntervalo: null, alertaIntervalo: false, intervaloCurtoMin: null, semRetorno: false, semSaida: false, motivo: null };
-      semVinculo.push({ chave: `c${id}`, nome: String(c.nome), loja: null, previsto: jornada ? `${deMinutos(jornada.inicio)}–${deMinutos(jornada.fim)}` : null, fontePrevisto: "escala", batidas: [], batidasExtras: 0, avaliacao: av, rotulo: "Sem vínculo com o Secullum", escalaSituacao: sit, foraDaEscala: false, semVinculo: true, unidade });
+      semVinculo.push({ chave: `c${id}`, funcionarioId: null, nome: String(c.nome), loja: null, previsto: jornada ? `${deMinutos(jornada.inicio)}–${deMinutos(jornada.fim)}` : null, fontePrevisto: "escala", batidas: [], batidasExtras: 0, avaliacao: av, rotulo: "Sem vínculo com o Secullum", escalaSituacao: sit, foraDaEscala: false, semVinculo: true, unidade });
       continue;
     }
     if (trabalha) escalados.add(f.id);
@@ -186,7 +176,7 @@ export async function montarAoVivo(db: SupabaseClient, agora = agoraNoBrasil()):
     const av = classificar({ jornada: trabalha ? jornada : null, batidas: b, agoraMin, folga: !trabalha && !motivoEscala, justificativa: just, confiavel: true });
     const loja = lojaDaEmpresa.get(f.empresaId) ?? null;
     const pessoa: PessoaAoVivo = {
-      chave: `c${id}`, nome: String(c.nome), loja, previsto: trabalha && jornada ? `${deMinutos(jornada.inicio)}–${deMinutos(jornada.fim)}` : null, fontePrevisto: trabalha ? "escala" : null, ...mostrar(b), avaliacao: av, rotulo: rotuloDe(av),
+      chave: `c${id}`, funcionarioId: f.id, nome: String(c.nome), loja, previsto: trabalha && jornada ? `${deMinutos(jornada.inicio)}–${deMinutos(jornada.fim)}` : null, fontePrevisto: trabalha ? "escala" : null, ...mostrar(b), avaliacao: av, rotulo: rotuloDe(av),
       escalaSituacao: sit, foraDaEscala: !trabalha && b.length > 0, semVinculo: false, unidade,
     };
     escalaPorLoja.set(loja, [...(escalaPorLoja.get(loja) ?? []), pessoa]);

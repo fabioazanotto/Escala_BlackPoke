@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ATUALIZAR_A_CADA_S, INTERVALO_ALERTA_MIN } from "@/config/ponto";
 import type { Avaliacao, Contagem } from "@/lib/ponto/aoVivo";
@@ -110,13 +111,24 @@ function Situacao({ p, visao }: { p: PessoaAoVivo; visao: Visao }) {
 const NOMES_BATIDA = ["Entrada", "Saída interv.", "Retorno", "Saída"];
 
 /** No celular: um cartão por pessoa, com a situação logo embaixo do nome (a tabela larga escondia a situação). */
-function Cartoes({ pessoas, visao }: { pessoas: PessoaAoVivo[]; visao: Visao }) {
+function NomeComLink({ p, mes }: { p: PessoaAoVivo; mes: string }) {
+  if (p.funcionarioId === null) return <>{p.nome}</>;
+  return (
+    <Link href={`/ponto/colaborador?f=${p.funcionarioId}&mes=${mes}`} className="underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-900" title="Ver o mês deste colaborador">
+      {p.nome}
+    </Link>
+  );
+}
+
+function Cartoes({ pessoas, visao, mes }: { pessoas: PessoaAoVivo[]; visao: Visao; mes: string }) {
   return (
     <ul className="divide-y divide-neutral-100">
       {pessoas.map((p) => (
         <li key={p.chave} className="py-3">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-medium">{p.nome}</p>
+            <p className="font-medium">
+              <NomeComLink p={p} mes={mes} />
+            </p>
             <p className="text-xs tabular-nums text-neutral-600">{p.previsto ?? "sem horário previsto"}</p>
           </div>
           <div className="mt-1">
@@ -134,12 +146,12 @@ function Cartoes({ pessoas, visao }: { pessoas: PessoaAoVivo[]; visao: Visao }) 
   );
 }
 
-function Tabela({ pessoas, visao }: { pessoas: PessoaAoVivo[]; visao: Visao }) {
+function Tabela({ pessoas, visao, mes }: { pessoas: PessoaAoVivo[]; visao: Visao; mes: string }) {
   if (pessoas.length === 0) return <p className="text-sm text-neutral-600">Ninguém nesta lista agora.</p>;
   return (
     <>
       <div className="md:hidden">
-        <Cartoes pessoas={pessoas} visao={visao} />
+        <Cartoes pessoas={pessoas} visao={visao} mes={mes} />
       </div>
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[760px] text-sm">
@@ -157,7 +169,9 @@ function Tabela({ pessoas, visao }: { pessoas: PessoaAoVivo[]; visao: Visao }) {
           <tbody>
             {pessoas.map((p) => (
               <tr key={p.chave} className="border-t border-neutral-100 align-top">
-                <td className="py-2 pr-3 font-medium">{p.nome}</td>
+                <td className="py-2 pr-3 font-medium">
+                  <NomeComLink p={p} mes={mes} />
+                </td>
                 <td className="py-2 pr-3 tabular-nums text-neutral-600">{p.previsto ?? "—"}</td>
                 {[0, 1, 2, 3].map((i) => (
                   <td key={i} className="py-2 pr-2 tabular-nums">
@@ -184,18 +198,18 @@ function Tabela({ pessoas, visao }: { pessoas: PessoaAoVivo[]; visao: Visao }) {
   );
 }
 
-function CartaoLoja({ loja, visao }: { loja: LojaAoVivo; visao: Visao }) {
+function CartaoLoja({ loja, visao, mes }: { loja: LojaAoVivo; visao: Visao; mes: string }) {
   const dados = visao === "ponto" ? loja.ponto : loja.escala;
   return (
     <section className="cartao space-y-3">
       <h2 className="text-lg font-semibold">{loja.nome}</h2>
       <Contadores c={dados.contagem} visao={visao} />
-      <Tabela pessoas={dados.pessoas} visao={visao} />
+      <Tabela pessoas={dados.pessoas} visao={visao} mes={mes} />
       {visao === "escala" && loja.escala.foraDaEscala.length > 0 && (
         <details className="rounded-xl border border-amber-200 bg-amber-50" open>
           <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-amber-900">Bateram ponto fora da escala de hoje ({loja.escala.foraDaEscala.length})</summary>
           <div className="px-3 pb-3">
-            <Tabela pessoas={loja.escala.foraDaEscala} visao="ponto" />
+            <Tabela pessoas={loja.escala.foraDaEscala} visao="ponto" mes={mes} />
           </div>
         </details>
       )}
@@ -205,6 +219,7 @@ function CartaoLoja({ loja, visao }: { loja: LojaAoVivo; visao: Visao }) {
 
 export function VisaoAoVivo() {
   const [visao, setVisao] = useState<Visao>("escala");
+  const [lojaSel, setLojaSel] = useState<string | null>(null); // null = todas as lojas
   const [painel, setPainel] = useState<PainelAoVivo | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -267,6 +282,23 @@ export function VisaoAoVivo() {
         )}
       </div>
 
+      {painel && painel.lojas.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-sm text-neutral-600">Loja</span>
+          {[{ chave: null as string | null, nome: "Todas" }, ...painel.lojas.map((l) => ({ chave: l.chave as string | null, nome: l.nome.replace("BlackPoke ", "") }))].map((l) => (
+            <button
+              key={l.chave ?? "todas"}
+              type="button"
+              aria-pressed={lojaSel === l.chave}
+              onClick={() => setLojaSel(l.chave)}
+              className={`inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium ${lojaSel === l.chave ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"}`}
+            >
+              {l.nome}
+            </button>
+          ))}
+        </div>
+      )}
+
       {erro && (
         <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
           Não consegui atualizar agora ({erro}). {painel ? `Mostrando os dados de ${lido}. ` : ""}Falta de dados não significa falta do colaborador.
@@ -277,10 +309,10 @@ export function VisaoAoVivo() {
 
       {painel && (
         <div className="space-y-4">
-          {painel.lojas.map((l) => (
-            <CartaoLoja key={l.chave} loja={l} visao={visao} />
+          {painel.lojas.filter((l) => lojaSel === null || l.chave === lojaSel).map((l) => (
+            <CartaoLoja key={l.chave} loja={l} visao={visao} mes={painel.diaDeTrabalho.slice(0, 7)} />
           ))}
-          {visao === "escala" && painel.semVinculo.length > 0 && (
+          {visao === "escala" && lojaSel === null && painel.semVinculo.length > 0 && (
             <section className="cartao space-y-2">
               <h2 className="text-lg font-semibold">Escalados sem vínculo com o Secullum ({painel.semVinculo.length})</h2>
               <p className="text-sm text-neutral-600">Não dá para saber se chegaram. Faça o vínculo em RH &gt; Integração do ponto &gt; Conferir funcionários.</p>

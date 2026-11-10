@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { identidade } from "@/config/identidade";
-import { abaAtiva, abasConfiguracoes, abasRH, destinoInicial, destinos, podeAcessar, rotasLargas, trilhas } from "@/config/menu";
+import { abaAtiva, abasConfiguracoes, destinoInicial, destinos, podeAcessar, rotasLargas, trilhas } from "@/config/menu";
 import { ROTULO_PERFIL } from "@/lib/acesso";
 import { Icone } from "@/components/Icones";
 import { useSessao } from "@/components/Sessao";
@@ -46,19 +46,39 @@ function BarraLateral({ aoNavegar }: { aoNavegar?: () => void }) {
         {destinos.filter((d) => d.perfis.includes(perfil.perfil)).map((d) => {
           const ativo = d.rotas.some((r) => caminho === r || caminho.startsWith(r + "/"));
           return (
-            <Link
-              key={d.href}
-              href={d.href}
-              onClick={aoNavegar}
-              aria-current={ativo ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${
-                ativo ? "bg-neutral-100 font-semibold text-neutral-900" : "text-neutral-700 hover:bg-neutral-50"
-              }`}
-              style={ativo ? { boxShadow: "inset 3px 0 0 var(--cor-destaque)" } : undefined}
-            >
-              <Icone nome={d.icone} />
-              {d.rotulo}
-            </Link>
+            <div key={d.href}>
+              <Link
+                href={d.href}
+                onClick={aoNavegar}
+                aria-current={ativo && !d.subitens ? "page" : undefined}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${
+                  ativo ? "bg-neutral-100 font-semibold text-neutral-900" : "text-neutral-700 hover:bg-neutral-50"
+                }`}
+                style={ativo ? { boxShadow: "inset 3px 0 0 var(--cor-destaque)" } : undefined}
+              >
+                <Icone nome={d.icone} />
+                {d.rotulo}
+              </Link>
+              {ativo && d.subitens && (
+                <ul className="mb-1 mt-1 space-y-0.5 border-l border-neutral-200 pl-3 ml-5">
+                  {d.subitens.map((i) => {
+                    const sub = i.exato ? caminho === i.href : abaAtiva(i.href, caminho);
+                    return (
+                      <li key={i.href}>
+                        <Link
+                          href={i.href}
+                          onClick={aoNavegar}
+                          aria-current={sub ? "page" : undefined}
+                          className={`block rounded-md px-3 py-1.5 text-sm ${sub ? "bg-neutral-100 font-semibold text-neutral-900" : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"}`}
+                        >
+                          {i.rotulo}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           );
         })}
       </nav>
@@ -116,11 +136,7 @@ export function Estrutura({ children }: { children: React.ReactNode }) {
 
   const trilha = trilhas[caminho] ?? [];
   const larga = rotasLargas.includes(caminho);
-  const abas = abasRH.some((a) => abaAtiva(a.href, caminho))
-    ? { lista: abasRH, rotulo: "RH" }
-    : abasConfiguracoes.some((a) => abaAtiva(a.href, caminho))
-      ? { lista: abasConfiguracoes, rotulo: "Configurações" }
-      : null;
+  const abas = abasConfiguracoes.some((a) => abaAtiva(a.href, caminho)) ? { lista: abasConfiguracoes, rotulo: "Configurações" } : null;
   const liberado = podeAcessar(perfil.perfil, caminho);
 
   return (

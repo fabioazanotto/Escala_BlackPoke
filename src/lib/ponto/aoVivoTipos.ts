@@ -4,6 +4,7 @@ import type { Avaliacao, Contagem } from "./aoVivo";
 
 export type PessoaAoVivo = {
   chave: string;
+  funcionarioId: number | null; // para abrir a tela do colaborador
   nome: string;
   loja: string | null;
   previsto: string | null; // "16:00–00:20"

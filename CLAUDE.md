@@ -32,6 +32,9 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   (admin logado ou cabeçalho `x-sincronizar-segredo`); SQL em `supabase/escala/14_ponto_marcacoes.sql`. Batida alterada ou removida no Secullum vai para `ponto_marcacoes_historico`; CPF e PIS nunca são guardados.
   Visão ao vivo (aba "Ponto" do RH, só admin): `src/lib/ponto/aoVivo.ts` (classificação testada, parâmetros em `src/config/ponto.ts`), `src/lib/servidor/pontoAoVivo.ts` e rota `GET /api/ponto/ao-vivo`.
   Lê o Secullum na hora (só leitura), por loja, em duas visões ("Escala de hoje" e "Ponto (todos)"). O dia de trabalho só vira às 05:00. Classificação operacional: não gera desconto nem falta oficial.
+  Tela "Ponto por colaborador" (`/ponto/colaborador`, só admin): mês de um funcionário (`src/lib/ponto/mes.ts`, `src/lib/servidor/pontoMes.ts`, rotas `GET /api/ponto/colaborador` e `/api/ponto/funcionarios`);
+  lê o Secullum na hora e mostra, lado a lado, a leitura do BlackPoke (escala x batidas) e o cálculo oficial (`Calcular`); exporta CSV e imprime. Sem escala no mês, o app NÃO declara faltas.
+  O menu do RH fica na barra lateral (subitens em `src/config/menu.ts`); só Configurações ainda usa abas no topo.
   A aba "Integração do ponto" (`/ponto-integracao`) reúne sincronização, conferência de funcionários e teste de conexão.
   Conferência de funcionários (aba Integração do ponto, só admin): `src/lib/ponto/conferencia.ts`; vínculos confirmados em `colaborador_ponto_ids` (nunca guarda CPF; desfazer encerra a vigência).
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
