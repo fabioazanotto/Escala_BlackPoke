@@ -28,6 +28,9 @@ export type ColaboradorBlackPoke = {
 };
 
 /** Empresa do Secullum incluída no projeto e a unidade do app a que corresponde (pode não existir ainda). */
+/** Vínculo confirmado pelo administrador: colaborador do BlackPoke = funcionário do Secullum. */
+export type VinculoConfirmado = { colaboradorId: string; funcionarioId: number };
+
 export type EmpresaConfigurada = { empresaId: number; nome: string; unidadeId: string | null; unidadeNome: string | null };
 
 export type LadoSecullum = { id: number; nome: string; cpfMascarado: string; empresa: string; unidadeEsperada: string | null; ativo: boolean; admissao: string | null; demissao: string | null; departamento: string; funcao: string };
@@ -36,7 +39,7 @@ export type LadoBlackPoke = { id: string; nome: string; cpfMascarado: string | n
 export type Item = {
   secullum?: LadoSecullum;
   blackpoke?: LadoBlackPoke;
-  confianca?: "cpf" | "nome";
+  confianca?: "vinculo" | "cpf" | "nome";
   motivos: string[];
 };
 
@@ -131,7 +134,7 @@ export function nomesCompativeis(a: string, b: string): boolean {
 
 // ---------------------------------------------------------------- conferência
 
-export function conferirFuncionarios(secullum: FuncionarioSecullum[], blackpoke: ColaboradorBlackPoke[], empresas: EmpresaConfigurada[]): ResultadoConferencia {
+export function conferirFuncionarios(secullum: FuncionarioSecullum[], blackpoke: ColaboradorBlackPoke[], empresas: EmpresaConfigurada[], vinculos: VinculoConfirmado[] = []): ResultadoConferencia {
   const empresaPorId = new Map(empresas.map((e) => [e.empresaId, e]));
   const unidadeEsperada = (s: FuncionarioSecullum) => empresaPorId.get(s.empresaId)?.unidadeNome ?? null;
 
@@ -206,13 +209,20 @@ export function conferirFuncionarios(secullum: FuncionarioSecullum[], blackpoke:
     return m;
   };
 
-  const parear = (s: FuncionarioSecullum, b: ColaboradorBlackPoke, confianca: "cpf" | "nome") => {
+  const parear = (s: FuncionarioSecullum, b: ColaboradorBlackPoke, confianca: "vinculo" | "cpf" | "nome") => {
     sLivres.delete(s.id);
     bLivres.delete(b.id);
     const motivos = divergencias(s, b);
     if (motivos.length > 0) resultado.resumo.comDivergencia += 1;
     resultado.nosDois.push({ secullum: ladoS(s), blackpoke: ladoB(b), confianca, motivos });
   };
+
+  // 0) Vínculos já confirmados pelo administrador valem mais que qualquer suposição.
+  for (const v of vinculos) {
+    const s = sPorId.get(v.funcionarioId);
+    const b = bPorId.get(v.colaboradorId);
+    if (s && b && sLivres.has(s.id) && bLivres.has(b.id)) parear(s, b, "vinculo");
+  }
 
   // Os passos 1 e 2 rodam primeiro só com os ATIVOS do Secullum e depois com os desligados: quem foi recontratado tem
   // um vínculo ativo e um desligado com o mesmo nome, e o ativo é o que vale (o desligado não concorre com ele).

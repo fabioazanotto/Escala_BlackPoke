@@ -133,4 +133,33 @@ describe("conferência", () => {
     expect(JSON.stringify(r)).not.toContain("12345678901");
     expect(r.soSecullum[0].secullum?.cpfMascarado).toBe("***.456.789-**");
   });
+
+  it("vínculo confirmado liga a dupla mesmo sem CPF e com nomes diferentes, e some das sugestões", () => {
+    const sec = S({ nome: "Davidson Alves Pinto", cpf: "99999999999" });
+    const bp = B({ nome: "Davidson" });
+    const r = conferirFuncionarios([sec, S({ nome: "Davidson Outro" })], [bp], empresas, [{ colaboradorId: bp.id, funcionarioId: sec.id }]);
+    expect(r.nosDois).toHaveLength(1);
+    expect(r.nosDois[0].confianca).toBe("vinculo");
+    expect(r.nosDois[0].secullum?.id).toBe(sec.id);
+    // o outro "Davidson" do Secullum não tem mais candidato livre: fica só no Secullum
+    expect(r.duvidosos).toHaveLength(0);
+    expect(r.soSecullum).toHaveLength(1);
+  });
+
+  it("vínculo que aponta para alguém que não existe mais é ignorado sem quebrar", () => {
+    const bp = B({ nome: "Fulana" });
+    const r = conferirFuncionarios([], [bp], empresas, [{ colaboradorId: bp.id, funcionarioId: 99999 }]);
+    expect(r.soBlackpoke).toHaveLength(1);
+  });
+
+  it("Seu Miyagi na casa de Santos: empresa da mesma unidade não gera divergência de unidade", () => {
+    const casa: EmpresaConfigurada[] = [
+      { empresaId: 1, nome: "BlackPoke Santos", unidadeId: "u-santos", unidadeNome: "Santos" },
+      { empresaId: 3, nome: "Pompeia", unidadeId: "u-santos", unidadeNome: "Santos" },
+    ];
+    const sec = S({ nome: "Sushi Man", empresaId: 3, empresaNome: "Pompeia", cpf: "55555555555" });
+    const bp = B({ nome: "Sushi Man", cpf: "55555555555", unidadeId: "u-santos", unidadeNome: "Santos" });
+    const r = conferirFuncionarios([sec], [bp], casa);
+    expect(r.nosDois[0].motivos).toEqual([]);
+  });
 });

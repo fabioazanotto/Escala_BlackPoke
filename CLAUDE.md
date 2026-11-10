@@ -27,6 +27,8 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   rota de diagnóstico `/api/secullum/diagnostico` (só admin; devolve estrutura e contagens, nunca dados pessoais) e tela `/ponto` (aba "Ponto" do RH).
   Variáveis na Vercel (Secret): `SECULLUM_USUARIO` e `SECULLUM_SENHA` (conta própria da integração); `SECULLUM_BANCO_ID` só se a conta enxergar mais de um banco.
   Uma das empresas do banco fica fora do projeto: o adaptador descarta os dados dela antes de gravar.
+  Seu Miyagi divide a casa (unidade Santos) para escala e folgas, mas é empresa separada para ponto, admissão e demissão (`ponto_empresas`).
+  Conferência de funcionários (aba Ponto, só admin): `src/lib/ponto/conferencia.ts`; vínculos confirmados em `colaborador_ponto_ids` (nunca guarda CPF; desfazer encerra a vigência).
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
   tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
   Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).

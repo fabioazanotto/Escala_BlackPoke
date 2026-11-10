@@ -22,7 +22,11 @@ function Resumo({ rotulo, valor, alerta }: { rotulo: string; valor: number; aler
   );
 }
 
-function Lista({ titulo, itens, aberta }: { titulo: string; itens: Item[]; aberta?: boolean }) {
+type Acao = { rotulo: string; aoClicar: (i: Item) => void; ocupado: string | null; pode: (i: Item) => boolean };
+
+const chaveDoItem = (i: Item) => `${i.blackpoke?.id ?? ""}|${i.secullum?.id ?? ""}`;
+
+function Lista({ titulo, itens, aberta, acao }: { titulo: string; itens: Item[]; aberta?: boolean; acao?: Acao }) {
   return (
     <details className="rounded-xl border border-neutral-200" open={aberta && itens.length > 0}>
       <summary className="cursor-pointer px-3 py-2.5 font-medium">
@@ -38,6 +42,7 @@ function Lista({ titulo, itens, aberta }: { titulo: string; itens: Item[]; abert
                 <th className="py-1 pr-3 font-medium">Secullum</th>
                 <th className="py-1 pr-3 font-medium">BlackPoke</th>
                 <th className="py-1 font-medium">Observação</th>
+                {acao && <th className="py-1 pl-3 font-medium" />}
               </tr>
             </thead>
             <tbody>
@@ -71,9 +76,18 @@ function Lista({ titulo, itens, aberta }: { titulo: string; itens: Item[]; abert
                     )}
                   </td>
                   <td className="py-2 text-neutral-700">
-                    {i.confianca && <p className="text-xs text-neutral-500">ligado por {i.confianca === "cpf" ? "CPF" : "nome"}</p>}
+                    {i.confianca && <p className="text-xs text-neutral-500">ligado por {i.confianca === "vinculo" ? "vínculo confirmado" : i.confianca === "cpf" ? "CPF" : "nome"}</p>}
                     {i.motivos.length === 0 ? <span className="text-green-800">Sem divergências</span> : i.motivos.map((m) => <p key={m}>{m}</p>)}
                   </td>
+                  {acao && (
+                    <td className="py-2 pl-3">
+                      {acao.pode(i) && (
+                        <button className="botao-secundario whitespace-nowrap !px-3 !py-2" disabled={acao.ocupado !== null} onClick={() => acao.aoClicar(i)}>
+                          {acao.ocupado === chaveDoItem(i) ? "Gravando…" : acao.rotulo}
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -89,10 +103,40 @@ export function ConferenciaFuncionarios() {
   const [erro, setErro] = useState<string | null>(null);
   const [resposta, setResposta] = useState<Resposta | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+
+  async function chamarVinculo(caminho: string, i: Item) {
+    if (!i.blackpoke || !i.secullum) return;
+    const desfazendo = caminho.endsWith("/desfazer");
+    const pergunta = desfazendo
+      ? `Desfazer o vínculo entre "${i.blackpoke.nome}" (BlackPoke) e "${i.secullum.nome}" (Secullum)?`
+      : `Confirmar que "${i.blackpoke.nome}" (BlackPoke) é a mesma pessoa que "${i.secullum.nome}" (Secullum, ${i.secullum.empresa})?`;
+    if (!window.confirm(pergunta)) return;
+    setOcupado(chaveDoItem(i));
+    setErro(null);
+    try {
+      const { data } = await supabase().auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Sessão expirada. Entre de novo.");
+      const r = await fetch(caminho, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ colaboradorId: i.blackpoke.id, funcionarioId: i.secullum.id }),
+        cache: "no-store",
+      });
+      if (!r.ok) {
+        const corpo = (await r.json().catch(() => ({}))) as { erro?: string };
+        throw new Error(corpo.erro ?? `Falha ${r.status}`);
+      }
+      await conferir(); // recarrega: o par confirmado passa para "nos dois sistemas"
+    } catch (e) {
+      setErro((e as Error).message);
+    }
+    setOcupado(null);
+  }
 
   async function conferir() {
     setCarregando(true);
-    setErro(null);
     setCopiado(null);
     try {
       const { data } = await supabase().auth.getSession();
@@ -104,6 +148,7 @@ export function ConferenciaFuncionarios() {
         throw new Error(r.status === 504 ? "O servidor demorou demais (504). Tente de novo." : (corpo.erro ?? `Falha ${r.status}`));
       }
       setResposta((await r.json()) as Resposta);
+      setErro(null);
     } catch (e) {
       setResposta(null);
       setErro((e as Error).message);
@@ -154,11 +199,11 @@ export function ConferenciaFuncionarios() {
           </p>
 
           <div className="space-y-2">
-            <Lista titulo="Casos duvidosos (confirmar se é a mesma pessoa)" itens={c.duvidosos} aberta />
+            <Lista titulo="Casos duvidosos (confirmar se é a mesma pessoa)" itens={c.duvidosos} aberta acao={{ rotulo: "É a mesma pessoa", ocupado, pode: (i) => !!i.blackpoke && !!i.secullum, aoClicar: (i) => chamarVinculo("/api/secullum/vinculos", i) }} />
             <Lista titulo="Duplicidades no Secullum" itens={c.duplicidades} aberta />
             <Lista titulo="Só no Secullum (ativos)" itens={c.soSecullum} aberta />
             <Lista titulo="Só no BlackPoke (ativos)" itens={c.soBlackpoke} aberta />
-            <Lista titulo="Nos dois sistemas" itens={c.nosDois} />
+            <Lista titulo="Nos dois sistemas" itens={c.nosDois} acao={{ rotulo: "Desfazer vínculo", ocupado, pode: (i) => i.confianca === "vinculo", aoClicar: (i) => chamarVinculo("/api/secullum/vinculos/desfazer", i) }} />
           </div>
 
           <div className="space-y-2">

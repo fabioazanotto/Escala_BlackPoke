@@ -184,8 +184,9 @@ Cada fase termina em entrega pequena, verificável e reversível. Só avança co
 ## 7. Decisões e perguntas
 
 **Respondidas pelo dono**
-- Seu Miyagi e ABC entram como **unidades do app** (hoje o app tem 2). Falta decidir como separar as pessoas
-  (o Seu Miyagi hoje aparece como "operação" dentro do Santos). Não será alterado antes de uma decisão explícita.
+- **Seu Miyagi divide a casa com a unidade Santos** (escala e calendário de folgas juntos), mas é **empresa separada** para ponto, admissão e demissão.
+  Modelo: a unidade do app é a casa (escala); a empresa do Secullum (vínculo confirmado) define o controle de ponto e o vínculo trabalhista.
+  ABC (empresa B. P SBC) continua sem unidade no app, por ora.
 - **Diretoria = perfil `admin`.** Não cria perfil novo.
 - **Regras trabalhistas (noturno, tolerâncias, banco de horas) ficam para depois.** Até lá, todo cálculo é provisório.
 - Exemplo de jornada informado para teste (turno do dia): entrada 09:00, saída para intervalo 15:00, retorno 16:00,
@@ -196,7 +197,7 @@ Cada fase termina em entrega pequena, verificável e reversível. Só avança co
 - Documentação oficial obtida (manual + Swagger).
 
 **Decidido pelo dono**
-- Mapeamento confirmado: cada loja do app corresponde a uma empresa do Secullum (identificadas por CNPJ na tabela de configuração, não neste arquivo).
+- Mapeamento confirmado: cada loja do app corresponde a uma empresa do Secullum (Santos e Seu Miyagi apontam para a mesma casa/unidade Santos) (identificadas por CNPJ na tabela de configuração, não neste arquivo).
 - **Uma das 5 empresas do banco fica fora do projeto.** O adaptador filtra por empresa e descarta os funcionários e marcações dela
   antes de gravar (minimização de dados, LGPD). Só as empresas explicitamente vinculadas a uma unidade são lidas.
 - A integração usará uma **Conta Secullum própria do BlackPoke** (não a de uma pessoa), com credenciais só na Vercel (Secret).
