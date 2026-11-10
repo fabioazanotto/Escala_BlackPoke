@@ -99,7 +99,7 @@ Cálculo interno é reconciliado com o resultado oficial do Secullum e as difere
 
 | Ação | Admin | RH | Gerência (só unidades atribuídas) | Diretoria |
 |---|---|---|---|---|
-| Configurar integração, credenciais, bancos, logs | sim | não | não | não |
+| Configurar integração, credenciais, bancos, logs | sim (inclui Diretoria) | não | não | não |
 | Ver marcações e cartão de ponto | sim | sim | sim | só indicadores consolidados |
 | Escala × Ponto | sim | sim | sim | indicadores |
 | Registrar justificativa interna | sim | sim | sim (operacional) | não |
@@ -107,7 +107,7 @@ Cálculo interno é reconciliado com o resultado oficial do Secullum e as difere
 | Reabrir fechamento | sim | sim (com motivo) | não | não |
 | Ver CPF completo | sim | sim | não | não |
 
-"Diretoria" hoje não existe como perfil; seria um quarto perfil ou uma permissão. As permissões seriam
+Decidido: **Diretoria é o perfil admin**, então a coluna Diretoria acompanha a coluna Admin. As permissões seriam
 efetivas (tabela de permissões), não pelo nome do cargo.
 
 ## 6. Plano em fases
@@ -175,15 +175,21 @@ Cada fase termina em entrega pequena, verificável e reversível. Só avança co
 - **Aceite:** diferenças contra o oficial explicadas e aceitas pelo RH.
 - **Condição final:** só depois disso se avalia qualquer escrita no Secullum (Etapa 13 do prompt).
 
-## 7. Perguntas pendentes (decisões que o projeto não resolve)
+## 7. Decisões e perguntas
 
-1. Quantos **bancos/empresas** existem no Secullum e quais lojas usam cada um? (Santos, Praia Grande, Seu Miyagi, ABC)
-2. Seu Miyagi e ABC entram como **unidades do app** ou continuam só como lojas de vendas? Hoje o app tem 2 unidades.
-3. Existe **um usuário de API** do Secullum com acesso a todos os bancos, ou um por banco?
-4. Posso receber o **documento da API** (PDF/Swagger)?
-5. Quem será **Diretoria** no app e o que deve ver?
-6. Existe **convenção coletiva** aplicável (adicional noturno, tolerâncias, banco de horas)? Até isso ser validado, tudo é provisório.
-7. Caso de teste do prompt (seção 8): qual das batidas está correta?
+**Respondidas pelo dono**
+- Seu Miyagi e ABC entram como **unidades do app** (hoje o app tem 2). Falta decidir como separar as pessoas
+  (o Seu Miyagi hoje aparece como "operação" dentro do Santos). Não será alterado antes de uma decisão explícita.
+- **Diretoria = perfil `admin`.** Não cria perfil novo.
+- **Regras trabalhistas (noturno, tolerâncias, banco de horas) ficam para depois.** Até lá, todo cálculo é provisório.
+- Exemplo de jornada informado para teste (turno do dia): entrada 09:00, saída para intervalo 15:00, retorno 16:00,
+  fim 17:20 (6h00 + 1h20 = 7h20, intervalo 1h00, sem horas noturnas).
+
+**Ainda abertas (dependem do Secullum)**
+1. Quantos bancos/empresas existem e quais lojas usam cada um.
+2. Se há um usuário de API com acesso a todos os bancos ou um por banco.
+3. O documento da API (PDF ou Swagger).
+4. Batidas do caso noturno da seção 8 (usaremos a variante B se nada for dito).
 
 ## 8. Caso de teste obrigatório: inconsistência encontrada
 
