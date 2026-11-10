@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LOJAS_XMENU } from "@/config/lojas";
 import { supabase } from "@/lib/supabase";
 import { hojeNoBrasil, somarDiasData } from "@/lib/vendas/datas";
 
@@ -8,7 +9,7 @@ type ResultadoLoja = { chave: string; nome: string; status: "ok" | "erro" | "sem
 type Ultima = { concluido_em: string; status: string };
 
 const DIAS_HISTORICO = 90;
-const DIAS_POR_PEDIDO = 10; // cada pedido ao servidor tem limite de 60 s
+const DIAS_POR_PEDIDO = 4; // cada pedido ao servidor tem limite de 60 s: blocos pequenos, uma loja por vez
 
 async function chamar(corpo: object): Promise<ResultadoLoja[]> {
   const { data } = await supabase().auth.getSession();
@@ -21,8 +22,20 @@ async function chamar(corpo: object): Promise<ResultadoLoja[]> {
     cache: "no-store",
   });
   const json = (await r.json().catch(() => ({}))) as { erro?: string; lojas?: ResultadoLoja[] };
-  if (!r.ok) throw new Error(json.erro ?? `Falha ${r.status}`);
+  if (!r.ok) {
+    if (r.status === 504) throw new Error("O servidor demorou demais para responder (504).");
+    throw new Error(json.erro ?? `Falha ${r.status}`);
+  }
   return json.lojas ?? [];
+}
+
+/** Tenta de novo uma vez: o que já foi gravado não se perde, pois cada dia é regravado por inteiro. */
+async function chamarComRetentativa(corpo: object): Promise<ResultadoLoja[]> {
+  try {
+    return await chamar(corpo);
+  } catch {
+    return chamar(corpo);
+  }
 }
 
 export function SincronizacaoVendas() {
@@ -71,21 +84,42 @@ export function SincronizacaoVendas() {
     executar(async () => {
       const hoje = hojeNoBrasil();
       const inicio = somarDiasData(hoje, -(DIAS_HISTORICO - 1));
-      const total = new Map<string, ResultadoLoja>();
+      const blocos: { de: string; ate: string }[] = [];
       for (let de = inicio; de <= hoje; de = somarDiasData(de, DIAS_POR_PEDIDO)) {
-        const ate = somarDiasData(de, DIAS_POR_PEDIDO - 1) > hoje ? hoje : somarDiasData(de, DIAS_POR_PEDIDO - 1);
-        setProgresso(`Buscando de ${de.split("-").reverse().join("/")} a ${ate.split("-").reverse().join("/")}…`);
-        for (const l of await chamar({ dataDe: de, dataAte: ate })) {
-          const antes = total.get(l.chave);
-          total.set(l.chave, {
-            ...l,
-            diasGravados: (antes?.diasGravados ?? 0) + l.diasGravados,
-            status: antes?.status === "erro" ? "erro" : l.status,
-            mensagem: antes?.mensagem ?? l.mensagem,
-          });
-        }
+        const fim = somarDiasData(de, DIAS_POR_PEDIDO - 1);
+        blocos.push({ de, ate: fim > hoje ? hoje : fim });
       }
-      return [...total.values()];
+      const feitos = new Map<string, number>(); // blocos concluídos por loja
+      const mostrar = () =>
+        setProgresso(
+          LOJAS_XMENU.map((l) => `${l.nome.replace("BlackPoke ", "")} ${Math.round(((feitos.get(l.chave) ?? 0) / blocos.length) * 100)}%`).join(" · "),
+        );
+      mostrar();
+
+      // Lojas em paralelo (cada uma com seu próprio limite de tempo); blocos em sequência dentro de cada loja.
+      return Promise.all(
+        LOJAS_XMENU.map(async (loja): Promise<ResultadoLoja> => {
+          let dias = 0;
+          for (const b of blocos) {
+            try {
+              const [r] = await chamarComRetentativa({ dataDe: b.de, dataAte: b.ate, lojas: [loja.chave] });
+              if (r.status !== "ok") return { ...r, diasGravados: dias + r.diasGravados };
+              dias += r.diasGravados;
+            } catch (e) {
+              return {
+                chave: loja.chave,
+                nome: loja.nome,
+                status: "erro",
+                diasGravados: dias,
+                mensagem: `${(e as Error).message} Parou em ${b.de.split("-").reverse().join("/")}.`,
+              };
+            }
+            feitos.set(loja.chave, (feitos.get(loja.chave) ?? 0) + 1);
+            mostrar();
+          }
+          return { chave: loja.chave, nome: loja.nome, status: "ok", diasGravados: dias };
+        }),
+      );
     });
 
   return (
