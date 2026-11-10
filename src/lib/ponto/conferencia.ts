@@ -101,16 +101,32 @@ export function nomesParecidos(a: string, b: string): boolean {
   });
 }
 
+/** Diferença de no máximo uma letra entre duas palavras (erro de digitação: "Lenilto" x "Lenilton", "Rafaela" x "Rafaella"). */
+function ateUmaLetraDeDiferenca(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1); // uma letra trocada
+  const [curta, longa] = a.length < b.length ? [a, b] : [b, a];
+  return curta.slice(i) === longa.slice(i + 1); // uma letra a mais
+}
+
+/** Mesmo primeiro nome, ou quase (uma letra de diferença, só em nomes com 5 letras ou mais para não confundir "Ana" e "Ani"). */
+function primeiroNomeCompativel(a: string, b: string): boolean {
+  return a === b || (a.length >= 5 && b.length >= 5 && ateUmaLetraDeDiferenca(a, b));
+}
+
 /**
- * Candidato a ser a mesma pessoa: nomes parecidos OU mesmo primeiro nome quando um dos lados só tem o primeiro nome
- * (é o caso do cadastro do BlackPoke, que usa "Davidson" ou "Matheus P."). Só serve para SUGERIR: nunca liga sozinho.
+ * Candidato a ser a mesma pessoa: nomes parecidos OU primeiro nome igual/quase igual quando um dos lados só tem o primeiro
+ * nome (é o caso do cadastro do BlackPoke, que usa "Davidson" ou "Matheus P."). Só serve para SUGERIR: nunca liga sozinho.
  */
 export function nomesCompativeis(a: string, b: string): boolean {
   const ta = normalizarNome(a).split(" ").filter(Boolean);
   const tb = normalizarNome(b).split(" ").filter(Boolean);
-  if (ta.length === 0 || tb.length === 0 || ta[0] !== tb[0]) return false;
+  if (ta.length === 0 || tb.length === 0 || !primeiroNomeCompativel(ta[0], tb[0])) return false;
   if (ta.length === 1 || tb.length === 1) return true;
-  return nomesParecidos(a, b);
+  return nomesParecidos([tb[0], ...ta.slice(1)].join(" "), tb.join(" "));
 }
 
 // ---------------------------------------------------------------- conferência

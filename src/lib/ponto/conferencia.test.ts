@@ -113,6 +113,21 @@ describe("conferência", () => {
     expect(nomesCompativeis("Ana Souza", "Ana Costa")).toBe(false);
   });
 
+  it("erro de digitação de uma letra no primeiro nome ainda gera sugestão", () => {
+    expect(nomesCompativeis("Lenilto", "Lenilton Gomes")).toBe(true);
+    expect(nomesCompativeis("Rafaela", "Rafaella Dias")).toBe(true);
+    expect(nomesCompativeis("Matheus P.", "Matheos Pereira")).toBe(true);
+    expect(nomesCompativeis("Ana", "Ani Souza")).toBe(false); // nomes curtos não toleram diferença
+    expect(nomesCompativeis("Marcos", "Marcio Souza")).toBe(false); // duas letras de diferença
+  });
+
+  it("Lenilto no BlackPoke e Lenilton no Secullum aparecem como sugestão", () => {
+    const r = conferirFuncionarios([S({ nome: "Lenilton Gomes de Sá", cpf: "12312312312" })], [B({ nome: "Lenilto" })], empresas);
+    expect(r.duvidosos).toHaveLength(1);
+    expect(r.soBlackpoke).toHaveLength(0);
+    expect(r.soSecullum).toHaveLength(0);
+  });
+
   it("não vaza o CPF inteiro", () => {
     const r = conferirFuncionarios([S({ nome: "Zé Dias", cpf: "12345678901" })], [], empresas);
     expect(JSON.stringify(r)).not.toContain("12345678901");
