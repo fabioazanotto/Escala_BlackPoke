@@ -60,8 +60,41 @@ POST e DELETE de Empresas, Horarios, Funcoes, Departamentos, Funcionarios, Afast
 especial), `GestaoArquivos` e `GravarLogsIniciarBkp`. O cliente do BlackPoke terá uma **lista fixa de rotas permitidas
 (só GET e `Calcular`)**: qualquer outra rota é recusada no código, mesmo por engano.
 
+## Formatos reais verificados (diagnóstico rodando na Vercel, 10/11/2026)
+Só nomes de campos e contagens; sem dados pessoais, IDs de banco ou CNPJs.
+
+- **Login e banco:** funcionou com `client_id=3`. O cabeçalho `secullumidbancoselecionado` aceitou o **`id` numérico** de `ListarBancos`
+  (o `identificador` com hífens não é necessário). A conta enxergou 1 banco.
+- **Restrição por empresas** (cadastro do usuário no Secullum) **é respeitada pela API**: `Empresas` devolveu só as empresas liberadas.
+  Mesmo assim o adaptador filtra por `EmpresaId` antes de gravar.
+- **Empresas:** `Id, Nome, Documento, Inscricao, Endereco, Bairro, Cidade, Cep, Uf, Pais, Telefone, Fax, CEI, NFolhaEmpresa, TipoDocumento,
+  ResponsavelNome, ResponsavelCargo, ResponsavelEmail, UtilizaRepC/A/P, Desativada, ConfigEspecificaInclusaoManualPonto`.
+- **Funcionarios:** `Id, Nome, NumeroFolha, NumeroIdentificador, NumeroPis, Cpf, Admissao, Demissao (nulo = ativo), EmpresaId + Empresa{}, HorarioId + Horario{},
+  DepartamentoId + Departamento{}, FuncaoId + Funcao{}, HorarioAlternativo2Id..4Id, BancoHorasId, Invisivel, DataAlteracao, MotivoDemissaoId, PossuiFoto,
+  AceitouTermosLgpdApp` e outros. **O vínculo com a empresa é `EmpresaId`** (não existe `EmpresaCnpjCpf` na resposta). O `GET` devolve também desligados.
+  Chave estável do Secullum: `Id` (o mesmo que aparece como `FuncionarioId` nas batidas).
+- **Batidas (agrupadas por funcionário e dia):** `Id, FuncionarioId, Data, Entrada1..5, Saida1..5 (texto HH:mm ou nulo), Observacoes, Ajuste, Abono2..4,
+  Compensado, AlmocoLivre, Neutro, NBanco, Folga (booleano), Refeicao, MemoriaEntrada1..5, MemoriaSaida1..5 (horários originais), EquipIdEntrada1..5,
+  EquipIdSaida1..5, FonteDadosIdEntrada1..5 / FonteDadosIdSaida1..5 e os objetos FonteDadosEntrada1..5 / FonteDadosSaida1..5, Funcionario{}`.
+  **Nos campos Entrada/Saida pode vir texto que não é horário: é o nome abreviado de uma justificativa** (ex.: férias). `Folga` é um booleano à parte.
+  Ainda não vimos "FALTA" como texto (não havia falta ontem): tratar qualquer texto não horário como justificativa/situação, sem converter em hora.
+- **FonteDados (batida a batida):** `Id, Data, Hora, EquipamentoId (pode ser nulo), FuncionarioId, FuncionarioPis, FuncionarioCpf, Tipo, Origem, Motivo, DataInclusao`.
+  Em um dia foram vistos `Tipo` 0 (original), 1 (manual) e 3 (desconsiderado). `Origem` 4 (Checkin), 2 (incluído manualmente) e **16, que NÃO está no manual**
+  (enumeração mais ampla que a documentada: guardar o número bruto e tratar valores desconhecidos sem quebrar).
+- **Leitura incremental:** `FonteDados/APartirDoId?fonteDadosId=N` funcionou (devolve IDs maiores ou iguais).
+- **Horarios:** `Id, Numero, Descricao, Desativar, Opcoes, Extras, Descanso, Dias, Ciclos, Dia, FaixasExtras, ColunasEmDias, ToleranciaEspecifica, Tipo, DataBase,
+  HorarioIdCopia*`. Cada item de `Dias`: `DiaSemana, Entrada1..5, Saida1..5, TipoEntrada/TipoSaida, Fechamento, ToleranciaExtra, ToleranciaFalta, GrupoDeExtra, Carga,
+  TipoDia, Compensado, AlmocoLivre, Neutro, SomarT, Acrescimo, Duracao, Alocar24Horas, HorarioAlternativo`. Existem `Ciclos`, `DataBase` e `Tipo`: **horários podem
+  ser cíclicos (rodízio)**, o que muda como a jornada prevista é obtida por data. Conferir no Horario de cada funcionário antes de usar.
+- **Funcoes** (21), **Justificativas** (12; campos `Id, NomeAbreviado, NomeCompleto, ValorDia, Ajuste, Abono2..4, LancarComoHorasFalta, NaoAbonarHorasNoturnas,
+  DescontarHorasBancoDeHoras, CalcularComoFolga, CalcularHorasAtrasoComoFalta, UsarJustificativaParaContagemDeFerias, Desativar` e outros),
+  **Equipamentos** (`Id, Descricao, EnderecoIP`; a conta enxergou 3, um a menos que o total do banco: o restante pertence a empresa não liberada),
+  **FuncionariosAfastamentos** (0 nos últimos 30 dias; campos a ver quando houver registros).
+- **Tempo de resposta:** cada consulta levou menos de 1 segundo.
+
 ## Pontos ainda abertos
-- Formato da resposta de `/Batidas` e de `/Funcionarios` (campos exatos, como aparecem FOLGA e FALTA): ver no diagnóstico.
+- Formato de `Calcular` e se a opção "Não permitir alterações" do usuário o bloqueia (testar na Fase 2).
 - Validade do token e limites além do `Calcular`.
 - `GET /Pendencias` do manual não existe no Swagger.
-- Qual conta Secullum será usada pela integração (precisa estar autorizada no banco).
+- Significado de `Origem = 16` e de `Tipo = 3` em detalhe (ver com o suporte Secullum se for relevante).
+- Campos de `FuncionariosAfastamentos` (sem registros para observar).

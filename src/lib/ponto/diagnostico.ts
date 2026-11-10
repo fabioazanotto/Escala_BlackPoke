@@ -22,7 +22,8 @@ export type Diagnostico = {
   etapas: Etapa[];
   bancos: BancoSecullum[];
   bancoUsado: string | null; // qual cabeçalho funcionou (o valor do banco não é segredo, mas só o tipo é mostrado)
-  empresas: { nome: string; documento: string; funcionariosAtivos: number }[];
+  empresas: { id: number | null; nome: string; documento: string; funcionariosAtivos: number; funcionariosDesligados: number }[];
+  funcionariosSemEmpresaVisivel: number; // devem ser 0: funcionários de empresas que a conta não enxerga
 };
 
 const HORA = /^\d{1,2}[:.]\d{2}$/;
@@ -52,7 +53,7 @@ const lista = (x: unknown) => (Array.isArray(x) ? x : []);
 
 export async function diagnosticar(hoje: string, ontem: string, dependencias: Partial<Dependencias> = {}): Promise<Diagnostico> {
   const etapas: Etapa[] = [];
-  const saida: Diagnostico = { etapas, bancos: [], bancoUsado: null, empresas: [] };
+  const saida: Diagnostico = { etapas, bancos: [], bancoUsado: null, empresas: [], funcionariosSemEmpresaVisivel: 0 };
 
   async function etapa<T>(nome: string, f: () => Promise<{ valor: T; mensagem: string; detalhes?: Record<string, unknown> }>): Promise<T | null> {
     const t0 = Date.now();
@@ -112,16 +113,32 @@ export async function diagnosticar(hoje: string, ontem: string, dependencias: Pa
     return { valor: f, mensagem: `${f.length} funcionário(s) devolvido(s).`, detalhes: { campos: camposDe(f) as CampoVisto[] } };
   });
 
-  // Ativos por empresa (só contagem). Demissao vazia = ativo.
-  const ativosPorEmpresa = new Map<string, number>();
+  // Ativos e desligados por empresa (só contagens). O funcionário aponta para a empresa por EmpresaId; Demissao vazia = ativo.
+  const resumoPorEmpresa = new Map<string, { ativos: number; desligados: number }>();
+  const idsVisiveis = new Set((empresasBrutas ?? []).map((e) => String(valorDoCampo(e, "Id"))));
+  let semEmpresaVisivel = 0;
   for (const f of funcionarios ?? []) {
-    const doc = String(valorDoCampo(f, "EmpresaCnpjCpf") ?? valorDoCampo(f, "empresaDocumento") ?? "");
-    const demissao = valorDoCampo(f, "Demissao");
-    if (!demissao) ativosPorEmpresa.set(doc, (ativosPorEmpresa.get(doc) ?? 0) + 1);
+    const empresaId = String(valorDoCampo(f, "EmpresaId") ?? "");
+    if (!idsVisiveis.has(empresaId)) {
+      semEmpresaVisivel += 1;
+      continue;
+    }
+    const r = resumoPorEmpresa.get(empresaId) ?? { ativos: 0, desligados: 0 };
+    if (valorDoCampo(f, "Demissao")) r.desligados += 1;
+    else r.ativos += 1;
+    resumoPorEmpresa.set(empresaId, r);
   }
+  saida.funcionariosSemEmpresaVisivel = semEmpresaVisivel;
   saida.empresas = (empresasBrutas ?? []).map((e) => {
-    const documento = String(valorDoCampo(e, "Documento") ?? valorDoCampo(e, "cnpjCpf") ?? "");
-    return { nome: String(valorDoCampo(e, "Nome") ?? ""), documento, funcionariosAtivos: ativosPorEmpresa.get(documento) ?? 0 };
+    const id = valorDoCampo(e, "Id");
+    const r = resumoPorEmpresa.get(String(id)) ?? { ativos: 0, desligados: 0 };
+    return {
+      id: typeof id === "number" ? id : null,
+      nome: String(valorDoCampo(e, "Nome") ?? "").trim(),
+      documento: String(valorDoCampo(e, "Documento") ?? ""),
+      funcionariosAtivos: r.ativos,
+      funcionariosDesligados: r.desligados,
+    };
   });
 
   await etapa("Horários", async () => {

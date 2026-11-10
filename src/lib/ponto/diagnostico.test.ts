@@ -13,11 +13,12 @@ function servidor(opts: { bancoAceitaId?: boolean; bancos?: unknown[] } = {}) {
     const banco = h.get("secullumidbancoselecionado");
     if (banco !== (bancoAceitaId ? "111" : "AB111")) return json([], 403);
     if (url.includes("/Departamentos")) return json([{ Id: 1, Descricao: "Cozinha" }]);
-    if (url.includes("/Empresas")) return json([{ Nome: "Empresa A", Documento: "11.111.111/0001-11" }, { Nome: "Empresa B", Documento: "22.222.222/0001-22" }]);
+    if (url.includes("/Empresas")) return json([{ Id: 10, Nome: "Empresa A ", Documento: "11.111.111/0001-11" }, { Id: 20, Nome: "Empresa B", Documento: "22.222.222/0001-22" }]);
     if (url.includes("/Funcionarios")) return json([
-      { Nome: "Fulano Secreto", Cpf: "99999999999", EmpresaCnpjCpf: "11.111.111/0001-11", Demissao: null },
-      { Nome: "Ciclano Secreto", Cpf: "88888888888", EmpresaCnpjCpf: "11.111.111/0001-11", Demissao: "2026-01-01" },
-      { Nome: "Beltrano Secreto", Cpf: "77777777777", EmpresaCnpjCpf: "22.222.222/0001-22", Demissao: null },
+      { Nome: "Fulano Secreto", Cpf: "99999999999", EmpresaId: 10, Demissao: null },
+      { Nome: "Ciclano Secreto", Cpf: "88888888888", EmpresaId: 10, Demissao: "2026-01-01" },
+      { Nome: "Beltrano Secreto", Cpf: "77777777777", EmpresaId: 20, Demissao: null },
+      { Nome: "Outro Secreto", Cpf: "66666666666", EmpresaId: 99, Demissao: null },
     ]);
     if (url.includes("/Horarios")) return json([{ Numero: 1, Dias: [{ DiaSemana: 0, Entrada1: "09:00" }] }]);
     if (url.includes("/Funcoes")) return json([{ Descricao: "Cozinheiro" }]);
@@ -38,9 +39,10 @@ describe("diagnóstico", () => {
     expect(d.etapas.every((e) => e.ok)).toBe(true);
     expect(d.bancoUsado).toBe("id");
     expect(d.empresas).toEqual([
-      { nome: "Empresa A", documento: "11.111.111/0001-11", funcionariosAtivos: 1 },
-      { nome: "Empresa B", documento: "22.222.222/0001-22", funcionariosAtivos: 1 },
+      { id: 10, nome: "Empresa A", documento: "11.111.111/0001-11", funcionariosAtivos: 1, funcionariosDesligados: 1 },
+      { id: 20, nome: "Empresa B", documento: "22.222.222/0001-22", funcionariosAtivos: 1, funcionariosDesligados: 0 },
     ]);
+    expect(d.funcionariosSemEmpresaVisivel).toBe(1);
     expect(d.etapas.map((e) => e.nome)).toContain("Leitura incremental (a partir de um ID)");
   });
 
@@ -48,7 +50,7 @@ describe("diagnóstico", () => {
     const f = servidor();
     const d = await diagnosticar("2026-11-10", "2026-11-09", { env, fetchFn: f as unknown as typeof fetch, esperaMs: 1 });
     const texto = JSON.stringify(d);
-    for (const proibido of ["Secreto", "99999999999", "88888888888", env.SECULLUM_SENHA, env.SECULLUM_USUARIO, "texto livre pessoal", "09:02", "17:00", "TOK"]) {
+    for (const proibido of ["Secreto", "99999999999", "88888888888", "66666666666", env.SECULLUM_SENHA, env.SECULLUM_USUARIO, "texto livre pessoal", "09:02", "17:00", "TOK"]) {
       expect(texto).not.toContain(proibido);
     }
   });

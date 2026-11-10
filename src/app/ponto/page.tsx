@@ -12,7 +12,8 @@ type Resposta = {
   etapas: Etapa[];
   bancos: { id: number | string; identificador: string; nome: string }[];
   bancoUsado: string | null;
-  empresas: { nome: string; documento: string; funcionariosAtivos: number }[];
+  empresas: { id: number | null; nome: string; documento: string; funcionariosAtivos: number; funcionariosDesligados: number }[];
+  funcionariosSemEmpresaVisivel?: number;
   verificadoEm: string;
 };
 
@@ -104,7 +105,8 @@ export default function Ponto() {
                         <tr>
                           <th className="py-1 pr-3 font-medium">Empresa</th>
                           <th className="py-1 pr-3 font-medium">CNPJ</th>
-                          <th className="py-1 text-right font-medium">Funcionários ativos</th>
+                          <th className="py-1 pr-3 text-right font-medium">Ativos</th>
+                          <th className="py-1 text-right font-medium">Desligados</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -112,12 +114,18 @@ export default function Ponto() {
                           <tr key={e.documento} className="border-t border-neutral-100">
                             <td className="py-1.5 pr-3">{e.nome}</td>
                             <td className="py-1.5 pr-3 tabular-nums">{e.documento}</td>
-                            <td className="py-1.5 text-right tabular-nums">{e.funcionariosAtivos}</td>
+                            <td className="py-1.5 pr-3 text-right tabular-nums">{e.funcionariosAtivos}</td>
+                            <td className="py-1.5 text-right tabular-nums">{e.funcionariosDesligados}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  {!!resposta.funcionariosSemEmpresaVisivel && (
+                    <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                      {resposta.funcionariosSemEmpresaVisivel} funcionário(s) pertencem a empresas que não estão nesta lista. O app descarta esses dados antes de gravar.
+                    </p>
+                  )}
                 </div>
               )}
 
