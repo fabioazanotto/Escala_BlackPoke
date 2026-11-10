@@ -22,6 +22,11 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   Sincronização: `src/lib/vendas/sincronizar.ts` (lógica, testada) + `src/lib/servidor/sincronizarVendas.ts` (liga ao Xmenu e ao banco) + rota
   `POST /api/vendas/sincronizar` (admin logado ou cabeçalho `x-sincronizar-segredo` vindo do agendador do banco). Reescreve os últimos 3 dias a cada rodada.
   Variáveis na Vercel (Secret): `SUPABASE_SERVICE_ROLE_KEY` e `SINCRONIZAR_SEGREDO`. A chave de serviço só é usada em `src/lib/servidor/supabaseAdmin.ts`.
+- Ponto (Secullum Ponto Web, SOMENTE LEITURA, em construção; plano em `docs/plano-ponto-secullum.md`, contrato em `docs/secullum-api.md`):
+  cliente em `src/lib/integracoes/secullum.ts` com lista fixa de rotas permitidas (só GET e `Calcular`; escrita é recusada no código),
+  rota de diagnóstico `/api/secullum/diagnostico` (só admin; devolve estrutura e contagens, nunca dados pessoais) e tela `/ponto` (aba "Ponto" do RH).
+  Variáveis na Vercel (Secret): `SECULLUM_USUARIO` e `SECULLUM_SENHA` (conta própria da integração); `SECULLUM_BANCO_ID` só se a conta enxergar mais de um banco.
+  Uma das empresas do banco fica fora do projeto: o adaptador descarta os dados dela antes de gravar.
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
   tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
   Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).
