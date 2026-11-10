@@ -15,6 +15,12 @@
   --viz-rotulo: #898781;
   --viz-texto: #52514e;
   --viz-faixa: #f4f3ee;
+
+  /* Vendas: uma cor fixa por canal (nunca muda com filtros). Validadas com o guia de gráficos. */
+  --canal-xmenu: #2a78d6;
+  --canal-ifood: #eb6834;
+  --canal-balcao: #1baf7a;
+  --canal-outros: #898781;
 }
 
 @theme inline {

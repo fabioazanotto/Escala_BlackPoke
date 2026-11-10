@@ -1,94 +1,132 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CabecalhoPagina } from "@/components/CabecalhoPagina";
-import { Icone } from "@/components/Icones";
+import { ConexaoXmenu } from "@/components/vendas/ConexaoXmenu";
+import { FiltrosLojasCanais, SeletorPeriodo } from "@/components/vendas/FiltrosVendas";
+import { GraficoVendas } from "@/components/vendas/GraficoVendas";
+import { IndicadoresVendas } from "@/components/vendas/IndicadoresVendas";
+import { ParticipacaoCanais } from "@/components/vendas/ParticipacaoCanais";
 import { SincronizacaoVendas } from "@/components/vendas/SincronizacaoVendas";
-import { supabase } from "@/lib/supabase";
+import { TabelaLojas } from "@/components/vendas/TabelaLojas";
+import type { CanalVenda } from "@/lib/tipos";
+import { carregarLinhas, carregarLojas, type LojaVenda } from "@/lib/vendas/carregar";
+import { CANAIS, filtrar, periodoAnterior, periodoDoTipo, somar, type LinhaVenda, type Periodo, type TipoPeriodo } from "@/lib/vendas/consulta";
+import { hojeNoBrasil, somarDiasData } from "@/lib/vendas/datas";
+import { dataBR, diaCurto } from "@/lib/vendas/formatar";
 
-type Teste = { nome: string; ok: boolean; status?: number; tempoMs: number; mensagem: string };
-type Loja = { chave: string; nome: string; storeId: string; tokenConfigurado: boolean; testes: Teste[] };
-type Resposta = { lojas: Loja[]; verificadoEm: string };
+type Carga = { chave: string; atual: LinhaVenda[]; anterior: LinhaVenda[] };
 
 export default function Vendas() {
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [resposta, setResposta] = useState<Resposta | null>(null);
+  const [hoje] = useState(() => hojeNoBrasil());
+  const [tipo, setTipo] = useState<TipoPeriodo>("ontem");
+  const [datas, setDatas] = useState({ de: somarDiasData(hoje, -6), ate: hoje });
+  const [lojas, setLojas] = useState<LojaVenda[] | null>(null);
+  const [lojasSel, setLojasSel] = useState<string[] | null>(null);
+  const [canaisSel, setCanaisSel] = useState<CanalVenda[]>(CANAIS);
+  const [carga, setCarga] = useState<Carga | null>(null);
+  const [erro, setErro] = useState<{ chave: string; texto: string } | null>(null);
 
-  async function testar() {
-    setCarregando(true);
-    setErro(null);
-    try {
-      const { data } = await supabase().auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("Sessão expirada. Entre de novo.");
-      const r = await fetch("/api/xmenu/diagnostico", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-      if (!r.ok) {
-        const corpo = (await r.json().catch(() => ({}))) as { erro?: string };
-        throw new Error(corpo.erro ?? `Falha ${r.status}`);
-      }
-      setResposta((await r.json()) as Resposta);
-    } catch (e) {
-      setResposta(null);
-      setErro((e as Error).message);
-    }
-    setCarregando(false);
-  }
+  const periodo: Periodo = tipo === "personalizado" ? { tipo, ...datas } : periodoDoTipo(tipo, hoje);
+  const anterior = periodoAnterior(periodo);
+  const chave = `${periodo.de}|${periodo.ate}`;
+
+  useEffect(() => {
+    let cancelado = false;
+    carregarLojas()
+      .then((l) => !cancelado && setLojas(l))
+      .catch((e) => !cancelado && setErro({ chave: "lojas", texto: (e as Error).message }));
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!lojas) return;
+    let cancelado = false;
+    Promise.all([carregarLinhas(periodo.de, periodo.ate, lojas), carregarLinhas(anterior.de, anterior.ate, lojas)])
+      .then(([atual, ant]) => !cancelado && setCarga({ chave, atual, anterior: ant }))
+      .catch((e) => !cancelado && setErro({ chave, texto: (e as Error).message }));
+    return () => {
+      cancelado = true;
+    };
+    // O período inteiro está resumido em "chave".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lojas, chave]);
+
+  const todasChaves = useMemo(() => lojas?.map((l) => l.chave) ?? [], [lojas]);
+  const lojasAtivas = lojasSel ?? todasChaves;
+  const lojasEscolhidas = (lojas ?? []).filter((l) => lojasAtivas.includes(l.chave));
+  // Lista vazia significa "todas".
+  const filtroLojas = lojasAtivas.length === todasChaves.length ? "" : lojasAtivas.join(",");
+  const filtroCanais = canaisSel.length === CANAIS.length ? "" : canaisSel.join(",");
+
+  const carregando = !carga || carga.chave !== chave;
+  const linhas = useMemo(() => {
+    if (!carga) return [];
+    return filtrar(carga.atual, { lojas: filtroLojas ? filtroLojas.split(",") : [], canais: filtroCanais ? (filtroCanais.split(",") as CanalVenda[]) : [] });
+  }, [carga, filtroLojas, filtroCanais]);
+  const linhasAnt = useMemo(() => {
+    if (!carga) return [];
+    return filtrar(carga.anterior, { lojas: filtroLojas ? filtroLojas.split(",") : [], canais: filtroCanais ? (filtroCanais.split(",") as CanalVenda[]) : [] });
+  }, [carga, filtroLojas, filtroCanais]);
+  const totais = useMemo(() => somar(linhas), [linhas]);
+  const totaisAnt = useMemo(() => somar(linhasAnt), [linhasAnt]);
+  const porCanal = useMemo(() => {
+    const r = {} as Record<CanalVenda, ReturnType<typeof somar>>;
+    for (const c of CANAIS) r[c] = somar(linhas.filter((l) => l.canal === c));
+    return r;
+  }, [linhas]);
+
+  // Aviso quando o período começa antes do histórico já carregado de alguma loja escolhida.
+  const incompletas = periodo.de >= somarDiasData(hoje, -2) ? [] : lojasEscolhidas.filter((l) => !l.historicoDesde || l.historicoDesde > periodo.de);
+
+  const textoPeriodo = periodo.de === periodo.ate ? `${diaCurto(periodo.de)}/${periodo.de.slice(0, 4)}` : `${dataBR(periodo.de)} a ${dataBR(periodo.ate)}`;
+  const erroTela = erro && (erro.chave === "lojas" || erro.chave === chave) ? erro.texto : null;
 
   return (
     <div>
-      <CabecalhoPagina titulo="Vendas" descricao="Vendas das lojas, vindas do Xmenu, em um só lugar." />
+      <CabecalhoPagina titulo="Vendas" descricao={`Dia de caixa: ${textoPeriodo}. Todas as lojas do Xmenu, em um só lugar.`}>
+        <SeletorPeriodo tipo={tipo} de={periodo.de} ate={periodo.ate} hoje={hoje} aoMudarTipo={setTipo} aoMudarDatas={(de, ate) => setDatas({ de, ate })} />
+      </CabecalhoPagina>
 
-      <SincronizacaoVendas />
+      {lojas && <FiltrosLojasCanais lojas={lojas} lojasSel={lojasAtivas} aoMudarLojas={setLojasSel} canaisSel={canaisSel} aoMudarCanais={setCanaisSel} />}
 
-      <section className="cartao mb-4 max-w-3xl space-y-3">
-        <h2 className="text-lg font-semibold">Conexão com o Xmenu</h2>
-        <p className="text-neutral-700">
-          Confere se o app consegue falar com cada loja do Xmenu. O teste só pergunta se o Xmenu respondeu: não mostra o
-          token e não traz nenhum dado de venda.
+      {erroTela && (
+        <p className="mb-4 rounded-xl bg-red-50 p-3 text-red-700">
+          Não consegui ler as vendas: {erroTela}. Se a tabela não existe, rode o SQL 09_vendas.sql.
         </p>
-        <button className="botao" onClick={testar} disabled={carregando}>
-          {carregando ? "Testando…" : "Testar conexão"}
-        </button>
-        {erro && <p className="rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
+      )}
 
-        {resposta && (
-          <ul className="space-y-3">
-            {resposta.lojas.map((l) => {
-              const tudoCerto = l.tokenConfigurado && l.testes.every((t) => t.ok);
-              return (
-                <li key={l.chave} className="rounded-xl border border-neutral-200 p-3">
-                  <p className="flex items-center gap-2 font-semibold">
-                    <Icone nome={tudoCerto ? "ok" : "alerta"} tamanho={18} className={tudoCerto ? "text-green-700" : "text-red-700"} />
-                    {l.nome} <span className="text-sm font-normal text-neutral-500">(loja {l.storeId})</span>
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {l.testes.map((t) => (
-                      <li key={t.nome} className="flex flex-wrap items-center gap-x-2">
-                        <span className={t.ok ? "text-green-800" : "text-red-700"}>{t.ok ? "Respondeu" : "Falhou"}</span>
-                        <span className="font-medium">{t.nome}</span>
-                        <span className="text-neutral-600">
-                          {t.ok ? `em ${t.tempoMs} ms` : t.mensagem}
-                          {!t.ok && t.status ? ` (código ${t.status})` : ""}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              );
-            })}
-            <li className="text-sm text-neutral-500">Verificado em {new Date(resposta.verificadoEm).toLocaleString("pt-BR")}.</li>
-          </ul>
-        )}
-      </section>
-
-      <section className="cartao max-w-3xl space-y-2">
-        <h2 className="text-lg font-semibold">Em construção</h2>
-        <p className="text-neutral-700">
-          Esta área é restrita a administradores. As próximas etapas trazem o banco de vendas e esta tela, com filtros de
-          lojas, período e canal (iFood, Xmenu e balcão).
+      {incompletas.length > 0 && (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          O histórico ainda está sendo carregado, então este período pode estar incompleto em:{" "}
+          {incompletas.map((l) => `${l.nome.replace("BlackPoke ", "")} (carregado ${l.historicoDesde ? `desde ${dataBR(l.historicoDesde)}` : "ainda não começou"})`).join("; ")}. Ele se completa sozinho.
         </p>
-      </section>
+      )}
+
+      {!erroTela && carregando && <p className="mb-4 text-sm text-neutral-600">Carregando vendas…</p>}
+
+      {!erroTela && !carregando && lojas && (
+        <div className="space-y-4">
+          <IndicadoresVendas atual={totais} anterior={totaisAnt} rotuloComparacao={anterior.rotulo} />
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="min-w-0 lg:col-span-2">
+              <GraficoVendas linhas={linhas} de={periodo.de} ate={periodo.ate} lojas={lojasEscolhidas} canais={canaisSel} />
+            </div>
+            <ParticipacaoCanais porCanal={porCanal} />
+          </div>
+          <TabelaLojas linhas={linhas} lojas={lojasEscolhidas} />
+        </div>
+      )}
+
+      <details className="mt-8">
+        <summary className="cursor-pointer text-sm font-medium text-neutral-700">Atualização das vendas e conexão com o Xmenu</summary>
+        <div className="mt-4 max-w-3xl space-y-4">
+          <SincronizacaoVendas />
+          <ConexaoXmenu />
+        </div>
+      </details>
     </div>
   );
 }
