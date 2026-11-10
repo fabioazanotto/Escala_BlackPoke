@@ -31,7 +31,7 @@ export type ColaboradorBlackPoke = {
 /** Vínculo confirmado pelo administrador: colaborador do BlackPoke = funcionário do Secullum. */
 export type VinculoConfirmado = { colaboradorId: string; funcionarioId: number };
 
-export type EmpresaConfigurada = { empresaId: number; nome: string; unidadeId: string | null; unidadeNome: string | null };
+export type EmpresaConfigurada = { empresaId: number; nome: string; unidadeId: string | null; unidadeNome: string | null; lojaChave?: string | null };
 
 export type LadoSecullum = { id: number; nome: string; cpfMascarado: string; empresa: string; unidadeEsperada: string | null; ativo: boolean; admissao: string | null; demissao: string | null; departamento: string; funcao: string };
 export type LadoBlackPoke = { id: string; nome: string; cpfMascarado: string | null; unidade: string; ativo: boolean; admissao: string | null; desligamento: string | null };

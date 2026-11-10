@@ -30,7 +30,10 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   Seu Miyagi divide a casa (unidade Santos) para escala e folgas, mas é empresa separada para ponto, admissão e demissão (`ponto_empresas`).
   Sincronização das batidas (somente leitura no Secullum): `src/lib/ponto/sincronizacao.ts` (lógica testada), `src/lib/servidor/sincronizarPonto.ts` e rota `POST /api/ponto/sincronizar`
   (admin logado ou cabeçalho `x-sincronizar-segredo`); SQL em `supabase/escala/14_ponto_marcacoes.sql`. Batida alterada ou removida no Secullum vai para `ponto_marcacoes_historico`; CPF e PIS nunca são guardados.
-  Conferência de funcionários (aba Ponto, só admin): `src/lib/ponto/conferencia.ts`; vínculos confirmados em `colaborador_ponto_ids` (nunca guarda CPF; desfazer encerra a vigência).
+  Visão ao vivo (aba "Ponto" do RH, só admin): `src/lib/ponto/aoVivo.ts` (classificação testada, parâmetros em `src/config/ponto.ts`), `src/lib/servidor/pontoAoVivo.ts` e rota `GET /api/ponto/ao-vivo`.
+  Lê o Secullum na hora (só leitura), por loja, em duas visões ("Escala de hoje" e "Ponto (todos)"). O dia de trabalho só vira às 05:00. Classificação operacional: não gera desconto nem falta oficial.
+  A aba "Integração do ponto" (`/ponto-integracao`) reúne sincronização, conferência de funcionários e teste de conexão.
+  Conferência de funcionários (aba Integração do ponto, só admin): `src/lib/ponto/conferencia.ts`; vínculos confirmados em `colaborador_ponto_ids` (nunca guarda CPF; desfazer encerra a vigência).
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
   tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
   Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).

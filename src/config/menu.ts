@@ -26,7 +26,7 @@ export const destinos: Destino[] = [
     rotulo: "RH",
     href: "/rh",
     icone: "rh",
-    rotas: ["/rh", "/escala-mensal", "/colaboradores", "/ausencias", "/cobertura", "/ponto"],
+    rotas: ["/rh", "/escala-mensal", "/colaboradores", "/ausencias", "/cobertura", "/ponto", "/ponto-integracao"],
     perfis: ["rh", "gerencia", "admin"],
   },
   {
@@ -46,6 +46,7 @@ export const abasRH: { rotulo: string; href: string }[] = [
   { rotulo: "Ausências", href: "/ausencias" },
   { rotulo: "Cobertura", href: "/cobertura" },
   { rotulo: "Ponto", href: "/ponto" },
+  { rotulo: "Integração do ponto", href: "/ponto-integracao" },
 ];
 
 // Abas dentro de Configurações.
@@ -67,6 +68,7 @@ export const trilhas: Record<string, string[]> = {
   "/ausencias": ["RH", "Ausências"],
   "/cobertura": ["RH", "Cobertura"],
   "/ponto": ["RH", "Ponto"],
+  "/ponto-integracao": ["RH", "Integração do ponto"],
   "/unidades": ["Configurações", "Unidades"],
   "/funcoes": ["Configurações", "Funções"],
   "/horarios": ["Configurações", "Horários"],

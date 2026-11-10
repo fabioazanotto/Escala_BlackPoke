@@ -17,12 +17,12 @@ export class ErroConfiguracaoPonto extends Error {}
 export async function carregarContexto(db: SupabaseClient): Promise<{ contexto: ContextoPonto; empresasApi: unknown[] }> {
   const { data: bancos } = await db.from("ponto_bancos").select("id, secullum_id").eq("ativo", true);
   if (!bancos || bancos.length !== 1) throw new ErroConfiguracaoPonto("Configure exatamente um banco ativo do Secullum (tabela ponto_bancos).");
-  const { data: cfg } = await db.from("ponto_empresas").select("documento, incluida, unidade_id, unidades(nome)").eq("banco_id", bancos[0].id).eq("incluida", true);
+  const { data: cfg } = await db.from("ponto_empresas").select("documento, incluida, unidade_id, loja_chave, unidades(nome)").eq("banco_id", bancos[0].id).eq("incluida", true);
   if (!cfg || cfg.length === 0) throw new ErroConfiguracaoPonto("Nenhuma empresa incluída em ponto_empresas.");
 
   const sessao = new SessaoSecullum(String(bancos[0].secullum_id));
   const empresasApi = lista(await sessao.obter("Empresas"));
-  const unidadePorDoc = new Map(cfg.map((c) => [String(c.documento), { unidadeId: (c.unidade_id as string | null) ?? null, unidadeNome: ((c.unidades as unknown as { nome?: string } | null)?.nome as string | undefined) ?? null }]));
+  const unidadePorDoc = new Map(cfg.map((c) => [String(c.documento), { unidadeId: (c.unidade_id as string | null) ?? null, unidadeNome: ((c.unidades as unknown as { nome?: string } | null)?.nome as string | undefined) ?? null, lojaChave: (c.loja_chave as string | null) ?? null }]));
   const empresas: EmpresaConfigurada[] = [];
   for (const e of empresasApi) {
     const u = unidadePorDoc.get(texto(valorDoCampo(e, "Documento")));
