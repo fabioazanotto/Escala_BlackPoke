@@ -86,6 +86,8 @@ export type Colaborador = {
   data_admissao: string | null;
   data_desligamento: string | null;
   ativo: boolean;
+  nome_completo?: string | null; // copiado do Secullum (colaboradores vinculados)
+  empresa?: string | null; // empresa do Secullum
 };
 
 export type Jornada = {

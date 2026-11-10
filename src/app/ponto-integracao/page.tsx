@@ -2,6 +2,7 @@
 
 import { CabecalhoPagina } from "@/components/CabecalhoPagina";
 import { useSessao } from "@/components/Sessao";
+import { AtualizarNomes } from "@/components/ponto/AtualizarNomes";
 import { ConexaoSecullum } from "@/components/ponto/ConexaoSecullum";
 import { ConferenciaFuncionarios } from "@/components/ponto/ConferenciaFuncionarios";
 import { SincronizacaoPonto } from "@/components/ponto/SincronizacaoPonto";
@@ -20,6 +21,7 @@ export default function IntegracaoDoPonto() {
         <div className="space-y-4">
           <SincronizacaoPonto />
           <ConferenciaFuncionarios />
+          <AtualizarNomes />
           <ConexaoSecullum />
         </div>
       )}

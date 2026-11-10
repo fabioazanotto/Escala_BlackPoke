@@ -28,7 +28,7 @@ const VAZIO: Formulario = {
   telefone: "", cpf: "", matricula: "", admissao: "", desligamento: "",
 };
 
-const COLUNAS = "id, unidade_id, nome, cargo, matricula, cpf, telefone, funcao_principal_id, turno, data_admissao, data_desligamento, ativo";
+const COLUNAS = "id, unidade_id, nome, nome_completo, empresa, cargo, matricula, cpf, telefone, funcao_principal_id, turno, data_admissao, data_desligamento, ativo";
 
 export default function Colaboradores() {
   const { perfil } = useSessao();
@@ -109,7 +109,7 @@ export default function Colaboradores() {
     (c) =>
       (mostrarInativos || c.ativo) &&
       (!filtroTurno || c.turno === filtroTurno) &&
-      semAcento(c.nome).includes(semAcento(busca)),
+      (semAcento(c.nome).includes(semAcento(busca)) || semAcento(c.nome_completo ?? "").includes(semAcento(busca))),
   );
 
   function abrirEdicao(c: Colaborador) {
@@ -334,7 +334,11 @@ export default function Colaboradores() {
             <li key={c.id} className={`cartao ${c.ativo ? "" : "opacity-60"}`}>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-lg font-semibold">{c.nome}</p>
+                  <p className="text-lg font-semibold">
+                    {c.nome_completo || c.nome}
+                    {c.empresa && <span className="ml-2 align-middle rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-700">{c.empresa}</span>}
+                  </p>
+                  {c.nome_completo && c.nome_completo !== c.nome && <p className="text-xs text-neutral-500">Na escala: {c.nome}</p>}
                   <p className="text-neutral-700">{principal ? rotuloFuncao(principal) : "—"}</p>
                   {c.cargo && <p className="text-sm text-neutral-600">Cargo: {c.cargo}</p>}
                   {c.telefone && <p className="text-neutral-700">{c.telefone}</p>}

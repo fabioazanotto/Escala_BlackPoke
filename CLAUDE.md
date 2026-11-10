@@ -35,7 +35,8 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   Tela "Ponto por colaborador" (`/ponto/colaborador`, só admin): mês de um funcionário (`src/lib/ponto/mes.ts`, `src/lib/servidor/pontoMes.ts`, rotas `GET /api/ponto/colaborador` e `/api/ponto/funcionarios`);
   lê o Secullum na hora e mostra, lado a lado, a leitura do BlackPoke (escala x batidas) e o cálculo oficial (`Calcular`); exporta CSV e imprime. Sem escala no mês, o app NÃO declara faltas.
   O menu do RH fica na barra lateral (subitens em `src/config/menu.ts`); só Configurações ainda usa abas no topo.
-  A aba "Integração do ponto" (`/ponto-integracao`) reúne sincronização, conferência de funcionários e teste de conexão.
+  A aba "Integração do ponto" (`/ponto-integracao`) reúne sincronização, conferência de funcionários, teste de conexão e "Nome completo e empresa pelo Secullum"
+  (`src/lib/ponto/nomes.ts`, rota `POST /api/ponto/nomes`: mostra o que muda e só grava `colaboradores.nome_completo` e `colaboradores.empresa` depois da confirmação; o nome curto da escala nunca é alterado).
   Conferência de funcionários (aba Integração do ponto, só admin): `src/lib/ponto/conferencia.ts`; vínculos confirmados em `colaborador_ponto_ids` (nunca guarda CPF; desfazer encerra a vigência).
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
   tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
