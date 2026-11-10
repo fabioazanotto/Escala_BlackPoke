@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { chamadorDaRequisicao } from "@/lib/servidor/admin";
 import { ambienteReal } from "@/lib/servidor/sincronizarVendas";
 import { supabaseAdmin } from "@/lib/servidor/supabaseAdmin";
+import { DIAS_HISTORICO_POR_RODADA, HISTORICO_DESDE } from "@/config/vendas";
+import { completarHistorico } from "@/lib/vendas/historico";
 import { sincronizarVendas, type Origem, type Pedido } from "@/lib/vendas/sincronizar";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +23,7 @@ function segredoConfere(request: Request): boolean {
 /**
  * Traz as vendas do Xmenu e grava os totais no banco.
  * Quem chama: o agendador do banco (cabeçalho x-sincronizar-segredo) ou o admin logado (botões da tela Vendas).
- * Corpo opcional: { dataDe, dataAte, lojas }. Sem datas, atualiza hoje e os 2 dias anteriores.
+ * Corpo opcional: { dataDe, dataAte, lojas } ou { historico: true }. Sem nada, atualiza hoje e os 2 dias anteriores.
  */
 export async function POST(request: Request) {
   let origem: Origem;
@@ -34,7 +36,7 @@ export async function POST(request: Request) {
     origem = "manual";
   }
 
-  const corpo = (await request.json().catch(() => ({}))) as { dataDe?: unknown; dataAte?: unknown; lojas?: unknown };
+  const corpo = (await request.json().catch(() => ({}))) as { dataDe?: unknown; dataAte?: unknown; lojas?: unknown; historico?: unknown };
   const texto = (v: unknown) => (typeof v === "string" ? v : undefined);
   const pedido: Pedido = {
     origem,
@@ -50,6 +52,11 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Modo histórico: volta alguns dias no passado, loja por loja, até HISTORICO_DESDE.
+    if (corpo.historico === true) {
+      const lojas = await completarHistorico(ambienteReal(db), { desde: HISTORICO_DESDE, diasPorRodada: DIAS_HISTORICO_POR_RODADA, lojas: pedido.lojas });
+      return Response.json({ lojas, concluidoEm: new Date().toISOString() }, { headers: semCache });
+    }
     const lojas = await sincronizarVendas(pedido, ambienteReal(db));
     return Response.json({ lojas, concluidoEm: new Date().toISOString() }, { headers: semCache });
   } catch (e) {

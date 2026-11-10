@@ -3,12 +3,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buscarVendasCaixaFechado, limitesDoDiaDeCaixa, tokenDaLoja } from "@/lib/integracoes/xmenu";
 import { hojeNoBrasil } from "@/lib/vendas/datas";
-import type { Ambiente } from "@/lib/vendas/sincronizar";
+import type { AmbienteHistorico } from "@/lib/vendas/historico";
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const PAUSA_ENTRE_CONSULTAS_MS = 300; // o Xmenu limita chamadas: vamos com calma
 
-export function ambienteReal(db: SupabaseClient): Ambiente {
+export function ambienteReal(db: SupabaseClient): AmbienteHistorico {
   const idDaLoja = new Map<string, string>();
 
   async function lojaId(chave: string): Promise<string> {
@@ -46,6 +46,14 @@ export function ambienteReal(db: SupabaseClient): Ambiente {
         })),
       });
       if (error) throw new Error(`Não consegui gravar ${dia}: ${error.message}`);
+    },
+    lerMarco: async (loja) => {
+      const { data } = await db.from("lojas_xmenu").select("historico_desde").eq("chave", loja.chave).maybeSingle();
+      return (data?.historico_desde as string | null | undefined) ?? null;
+    },
+    gravarMarco: async (loja, dia) => {
+      const { error } = await db.from("lojas_xmenu").update({ historico_desde: dia }).eq("chave", loja.chave);
+      if (error) throw new Error(`Não consegui guardar o ponto do histórico: ${error.message}`);
     },
     registrar: async (loja, p) => {
       await db.from("sincronizacoes").insert({
