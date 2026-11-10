@@ -53,6 +53,7 @@ export type ResultadoConferencia = {
     duplicidades: number;
     comDivergencia: number;
     blackpokeSemCpf: number;
+    recontratados: number; // ativos que também têm um vínculo anterior (desligado) no Secullum
   };
   nosDois: Item[];
   soSecullum: Item[];
@@ -100,6 +101,18 @@ export function nomesParecidos(a: string, b: string): boolean {
   });
 }
 
+/**
+ * Candidato a ser a mesma pessoa: nomes parecidos OU mesmo primeiro nome quando um dos lados só tem o primeiro nome
+ * (é o caso do cadastro do BlackPoke, que usa "Davidson" ou "Matheus P."). Só serve para SUGERIR: nunca liga sozinho.
+ */
+export function nomesCompativeis(a: string, b: string): boolean {
+  const ta = normalizarNome(a).split(" ").filter(Boolean);
+  const tb = normalizarNome(b).split(" ").filter(Boolean);
+  if (ta.length === 0 || tb.length === 0 || ta[0] !== tb[0]) return false;
+  if (ta.length === 1 || tb.length === 1) return true;
+  return nomesParecidos(a, b);
+}
+
 // ---------------------------------------------------------------- conferência
 
 export function conferirFuncionarios(secullum: FuncionarioSecullum[], blackpoke: ColaboradorBlackPoke[], empresas: EmpresaConfigurada[]): ResultadoConferencia {
@@ -133,6 +146,7 @@ export function conferirFuncionarios(secullum: FuncionarioSecullum[], blackpoke:
       duplicidades: 0,
       comDivergencia: 0,
       blackpokeSemCpf: blackpoke.filter((b) => b.ativo && soDigitos(b.cpf).length !== 11).length,
+      recontratados: 0,
     },
     nosDois: [],
     soSecullum: [],
@@ -141,9 +155,11 @@ export function conferirFuncionarios(secullum: FuncionarioSecullum[], blackpoke:
     duplicidades: [],
   };
 
-  // Duplicidades dentro do Secullum (mesmo CPF ou mesmo nome normalizado entre pessoas diferentes).
+  // Duplicidades: duas pessoas ATIVAS no Secullum com o mesmo CPF ou o mesmo nome. Ativo + desligado com o mesmo CPF
+  // é recontratação (vínculos diferentes ao longo do tempo), não duplicidade: só entra na contagem.
+  const ativos = secullum.filter((s) => s.ativo);
   const grupos = new Map<string, FuncionarioSecullum[]>();
-  for (const s of secullum) {
+  for (const s of ativos) {
     const chaves = [soDigitos(s.cpf).length === 11 ? `cpf:${soDigitos(s.cpf)}` : "", `nome:${normalizarNome(s.nome)}`].filter(Boolean);
     for (const k of chaves) grupos.set(k, [...(grupos.get(k) ?? []), s]);
   }
@@ -153,9 +169,11 @@ export function conferirFuncionarios(secullum: FuncionarioSecullum[], blackpoke:
     for (const s of lista) {
       if (jaListados.has(s.id)) continue;
       jaListados.add(s.id);
-      resultado.duplicidades.push({ secullum: ladoS(s), motivos: [chave.startsWith("cpf:") ? "Mesmo CPF em mais de um cadastro do Secullum" : "Mesmo nome em mais de um cadastro do Secullum"] });
+      resultado.duplicidades.push({ secullum: ladoS(s), motivos: [chave.startsWith("cpf:") ? "Mesmo CPF em mais de um cadastro ativo do Secullum" : "Mesmo nome em mais de um cadastro ativo do Secullum"] });
     }
   }
+  const cpfsDesligados = new Set(secullum.filter((s) => !s.ativo && soDigitos(s.cpf).length === 11).map((s) => soDigitos(s.cpf)));
+  resultado.resumo.recontratados = ativos.filter((s) => cpfsDesligados.has(soDigitos(s.cpf))).length;
 
   const sLivres = new Set(secullum.map((s) => s.id));
   const bLivres = new Set(blackpoke.map((b) => b.id));
@@ -180,59 +198,63 @@ export function conferirFuncionarios(secullum: FuncionarioSecullum[], blackpoke:
     resultado.nosDois.push({ secullum: ladoS(s), blackpoke: ladoB(b), confianca, motivos });
   };
 
-  // 1) Mesmo CPF.
+  // Os passos 1 e 2 rodam primeiro só com os ATIVOS do Secullum e depois com os desligados: quem foi recontratado tem
+  // um vínculo ativo e um desligado com o mesmo nome, e o ativo é o que vale (o desligado não concorre com ele).
   const bPorCpf = new Map<string, ColaboradorBlackPoke[]>();
   for (const b of blackpoke) if (soDigitos(b.cpf).length === 11) bPorCpf.set(soDigitos(b.cpf), [...(bPorCpf.get(soDigitos(b.cpf)) ?? []), b]);
-  for (const s of secullum) {
-    if (!sLivres.has(s.id) || jaListados.has(s.id)) continue;
-    const c = (bPorCpf.get(soDigitos(s.cpf)) ?? []).filter((b) => bLivres.has(b.id));
-    if (c.length === 1) parear(s, c[0], "cpf");
-  }
 
-  // 2) Mesmo nome (normalizado), só quando é inequívoco dos dois lados.
-  const sPorNome = new Map<string, FuncionarioSecullum[]>();
-  for (const id of sLivres) {
-    const s = sPorId.get(id)!;
-    sPorNome.set(normalizarNome(s.nome), [...(sPorNome.get(normalizarNome(s.nome)) ?? []), s]);
-  }
-  const bPorNome = new Map<string, ColaboradorBlackPoke[]>();
-  for (const id of bLivres) {
-    const b = bPorId.get(id)!;
-    bPorNome.set(normalizarNome(b.nome), [...(bPorNome.get(normalizarNome(b.nome)) ?? []), b]);
-  }
-  for (const [nome, ss] of sPorNome) {
-    const bs = bPorNome.get(nome) ?? [];
-    if (ss.length === 1 && bs.length === 1 && !jaListados.has(ss[0].id)) {
-      const [s, b] = [ss[0], bs[0]];
-      const cpfsDiferem = soDigitos(s.cpf).length === 11 && soDigitos(b.cpf).length === 11 && soDigitos(s.cpf) !== soDigitos(b.cpf);
-      if (cpfsDiferem) {
-        sLivres.delete(s.id);
-        bLivres.delete(b.id);
-        resultado.duvidosos.push({ secullum: ladoS(s), blackpoke: ladoB(b), motivos: ["Mesmo nome, mas CPFs diferentes"] });
-      } else {
-        parear(s, b, "nome");
-      }
-    } else if (bs.length > 0) {
-      for (const s of ss) {
-        sLivres.delete(s.id);
-        resultado.duvidosos.push({ secullum: ladoS(s), motivos: [`Nome igual a ${bs.length} colaborador(es) do BlackPoke e a ${ss.length} cadastro(s) do Secullum: não dá para ligar sozinho`] });
+  const rodada = (ehAtivo: boolean) => {
+    const pool = secullum.filter((s) => s.ativo === ehAtivo && sLivres.has(s.id) && !jaListados.has(s.id));
+
+    // 1) Mesmo CPF.
+    for (const s of pool) {
+      if (!sLivres.has(s.id)) continue;
+      const c = (bPorCpf.get(soDigitos(s.cpf)) ?? []).filter((b) => bLivres.has(b.id));
+      if (c.length === 1) parear(s, c[0], "cpf");
+    }
+
+    // 2) Mesmo nome (normalizado), só quando é inequívoco dos dois lados.
+    const sPorNome = new Map<string, FuncionarioSecullum[]>();
+    for (const s of pool) if (sLivres.has(s.id)) sPorNome.set(normalizarNome(s.nome), [...(sPorNome.get(normalizarNome(s.nome)) ?? []), s]);
+    const bPorNome = new Map<string, ColaboradorBlackPoke[]>();
+    for (const id of bLivres) {
+      const b = bPorId.get(id)!;
+      bPorNome.set(normalizarNome(b.nome), [...(bPorNome.get(normalizarNome(b.nome)) ?? []), b]);
+    }
+    for (const [nome, ss] of sPorNome) {
+      const bs = bPorNome.get(nome) ?? [];
+      if (ss.length === 1 && bs.length === 1) {
+        const [s, b] = [ss[0], bs[0]];
+        const cpfsDiferem = soDigitos(s.cpf).length === 11 && soDigitos(b.cpf).length === 11 && soDigitos(s.cpf) !== soDigitos(b.cpf);
+        if (cpfsDiferem) {
+          sLivres.delete(s.id);
+          bLivres.delete(b.id);
+          resultado.duvidosos.push({ secullum: ladoS(s), blackpoke: ladoB(b), motivos: ["Mesmo nome, mas CPFs diferentes"] });
+        } else {
+          parear(s, b, "nome");
+        }
+      } else if (bs.length > 0) {
+        for (const s of ss) {
+          sLivres.delete(s.id);
+          resultado.duvidosos.push({ secullum: ladoS(s), motivos: [`Nome igual a ${bs.length} colaborador(es) do BlackPoke e a ${ss.length} cadastro(s) do Secullum: não dá para ligar sozinho`] });
+        }
       }
     }
-  }
+  };
+  rodada(true);
+  rodada(false);
 
-  // 3) O que sobrou: nomes parecidos vão para decisão do RH; o resto é "só em um dos lados".
+  // 3) O que sobrou: candidatos (nome parecido ou mesmo primeiro nome) vão para decisão do RH; o resto é "só em um dos lados".
   for (const id of [...sLivres]) {
     const s = sPorId.get(id)!;
-    if (jaListados.has(s.id)) {
-      sLivres.delete(id);
-      continue;
-    }
-    const parecidos = [...bLivres].map((x) => bPorId.get(x)!).filter((b) => nomesParecidos(s.nome, b.nome));
-    if (parecidos.length > 0) {
-      sLivres.delete(id);
-      for (const b of parecidos) {
-        resultado.duvidosos.push({ secullum: ladoS(s), blackpoke: ladoB(b), motivos: ["Nomes parecidos (um pode estar abreviado): confirmar se é a mesma pessoa"] });
-      }
+    if (jaListados.has(s.id) || !s.ativo) continue; // desligados não entram na procura de candidatos
+    const candidatos = [...bLivres].map((x) => bPorId.get(x)!).filter((b) => b.ativo && nomesCompativeis(s.nome, b.nome));
+    if (candidatos.length === 0) continue;
+    sLivres.delete(id);
+    for (const b of candidatos) {
+      const esperada = empresaPorId.get(s.empresaId);
+      const mesma = esperada?.unidadeId ? (esperada.unidadeId === b.unidadeId ? " Mesma unidade." : ` Unidades diferentes (${esperada.unidadeNome} no Secullum, ${b.unidadeNome} no BlackPoke).`) : "";
+      resultado.duvidosos.push({ secullum: ladoS(s), blackpoke: ladoB(b), motivos: [`Mesmo primeiro nome / nome parecido: confirmar se é a mesma pessoa.${mesma}`] });
     }
   }
   const duvidososB = new Set(resultado.duvidosos.map((d) => d.blackpoke?.id).filter(Boolean));

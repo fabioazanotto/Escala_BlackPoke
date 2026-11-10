@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conferirFuncionarios, mascararCpf, nomesParecidos, normalizarNome, type ColaboradorBlackPoke, type EmpresaConfigurada, type FuncionarioSecullum } from "./conferencia";
+import { conferirFuncionarios, mascararCpf, nomesCompativeis, nomesParecidos, normalizarNome, type ColaboradorBlackPoke, type EmpresaConfigurada, type FuncionarioSecullum } from "./conferencia";
 
 const empresas: EmpresaConfigurada[] = [
   { empresaId: 1, nome: "Empresa Santos", unidadeId: "u-santos", unidadeNome: "Santos" },
@@ -81,10 +81,36 @@ describe("conferência", () => {
     expect(m).toContain("admissão diferente");
   });
 
-  it("duplicidades no Secullum e nomes iguais ambíguos não são ligados sozinhos", () => {
+  it("duplicidades só entre ATIVOS; ativo + desligado com o mesmo CPF é recontratação", () => {
     const r = conferirFuncionarios([S({ nome: "Duda Neves", cpf: "77777777777" }), S({ nome: "Duda Neves", cpf: "77777777777" })], [B({ nome: "Duda Neves" })], empresas);
     expect(r.duplicidades).toHaveLength(2);
     expect(r.nosDois).toHaveLength(0);
+
+    const re = conferirFuncionarios([S({ nome: "Lia Prado", cpf: "88888888888" }), S({ nome: "Lia Prado", cpf: "88888888888", ativo: false, demissao: "2025-03-01" })], [B({ nome: "Lia Prado" })], empresas);
+    expect(re.duplicidades).toHaveLength(0);
+    expect(re.resumo.recontratados).toBe(1);
+    expect(re.nosDois).toHaveLength(1);
+    expect(re.nosDois[0].secullum?.ativo).toBe(true);
+  });
+
+  it("cadastro só com o primeiro nome vira sugestão (dúvida), nunca é ligado sozinho", () => {
+    const r = conferirFuncionarios([S({ nome: "Davidson Alves Pinto", cpf: "99999999999" })], [B({ nome: "Davidson" })], empresas);
+    expect(r.nosDois).toHaveLength(0);
+    expect(r.duvidosos).toHaveLength(1);
+    expect(r.duvidosos[0].motivos[0]).toContain("Mesma unidade");
+    expect(r.soBlackpoke).toHaveLength(0);
+    expect(r.soSecullum).toHaveLength(0);
+  });
+
+  it("dois candidatos com o mesmo primeiro nome aparecem os dois", () => {
+    const r = conferirFuncionarios([S({ nome: "Ana Souza" }), S({ nome: "Ana Costa" })], [B({ nome: "Ana" })], empresas);
+    expect(r.duvidosos).toHaveLength(2);
+  });
+
+  it("nomes compatíveis", () => {
+    expect(nomesCompativeis("Davidson", "Davidson Alves")).toBe(true);
+    expect(nomesCompativeis("Rafaella", "Rafael Souza")).toBe(false);
+    expect(nomesCompativeis("Ana Souza", "Ana Costa")).toBe(false);
   });
 
   it("não vaza o CPF inteiro", () => {

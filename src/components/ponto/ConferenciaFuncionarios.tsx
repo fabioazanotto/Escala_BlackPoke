@@ -150,7 +150,7 @@ export function ConferenciaFuncionarios() {
             <Resumo rotulo="Duplicidades" valor={c.resumo.duplicidades} alerta />
           </div>
           <p className="text-sm text-neutral-600">
-            Desligados no Secullum (das empresas incluídas): {c.resumo.secullumDesligados}. Inativos no BlackPoke: {c.resumo.blackpokeInativos}. Colaboradores ativos do BlackPoke sem CPF: {c.resumo.blackpokeSemCpf}.
+            Desligados no Secullum (das empresas incluídas): {c.resumo.secullumDesligados}. Inativos no BlackPoke: {c.resumo.blackpokeInativos}. Colaboradores ativos do BlackPoke sem CPF: {c.resumo.blackpokeSemCpf}. Ativos no Secullum com vínculo anterior já desligado (recontratados): {c.resumo.recontratados}.
           </p>
 
           <div className="space-y-2">
