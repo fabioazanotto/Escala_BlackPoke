@@ -98,6 +98,12 @@ Só nomes de campos e contagens; sem dados pessoais, IDs de banco ou CNPJs.
   Uso: reconciliar o nosso cálculo com o oficial (Normais, Faltas, Extras, Atrasos, Adiantamentos, Noturno, Carga, Folga). Lembrete: 100 chamadas por hora por banco, um funcionário por chamada.
 - **Funcionários só das empresas liberadas:** com a restrição por empresas no usuário, `Funcionarios` também só devolveu funcionários das empresas incluídas (0 de fora).
 
+- **FonteDados NÃO respeita a restrição por empresas do usuário** (verificado na primeira carga de 90 dias): de 8.599 registros lidos, 4.747 eram de funcionários de fora das
+  empresas liberadas. `Empresas` e `Funcionarios` vêm filtrados, mas `FonteDados` (e por extensão `Batidas`) devolve o banco inteiro. **O filtro por funcionário no adaptador é
+  obrigatório**; os registros de fora são descartados em memória e nunca gravados.
+- `Origem = 16` apareceu só junto do equipamento de "Ponto Virtual" (223 de 223): provavelmente é a origem desse equipamento. Hipótese; guardar o número bruto.
+- Primeira carga (90 dias, empresas do projeto): 3.852 batidas de 24 funcionários; tipos 0 (original) 3.425, 1 (manual) 314, 3 (desconsiderada) 113; origens 4 (Checkin) 3.315, 2 (manual) 314, 16 (Ponto Virtual?) 223.
+
 ## Pontos ainda abertos
 - Validade do token e limites além do `Calcular`.
 - `GET /Pendencias` do manual não existe no Swagger.
