@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CabecalhoPagina } from "@/components/CabecalhoPagina";
+import { FaixaRecordes } from "@/components/vendas/FaixaRecordes";
 import { ConexaoXmenu } from "@/components/vendas/ConexaoXmenu";
 import { FiltrosLojasCanais, SeletorPeriodo } from "@/components/vendas/FiltrosVendas";
 import { GraficoVendas } from "@/components/vendas/GraficoVendas";
@@ -10,7 +11,8 @@ import { ParticipacaoCanais } from "@/components/vendas/ParticipacaoCanais";
 import { SincronizacaoVendas } from "@/components/vendas/SincronizacaoVendas";
 import { TabelaLojas } from "@/components/vendas/TabelaLojas";
 import type { CanalVenda } from "@/lib/tipos";
-import { carregarLinhas, carregarLojas, type LojaVenda } from "@/lib/vendas/carregar";
+import { carregarLinhas, carregarLojas, carregarRecordes, type LojaVenda } from "@/lib/vendas/carregar";
+import { recordesDoDia, vigentes, type Recorde } from "@/lib/vendas/recordes";
 import { CANAIS, filtrar, periodoAnterior, periodoDoTipo, somar, type LinhaVenda, type Periodo, type TipoPeriodo } from "@/lib/vendas/consulta";
 import { hojeNoBrasil, somarDiasData } from "@/lib/vendas/datas";
 import { dataBR, diaCurto } from "@/lib/vendas/formatar";
@@ -25,6 +27,7 @@ export default function Vendas() {
   const [lojasSel, setLojasSel] = useState<string[] | null>(null);
   const [canaisSel, setCanaisSel] = useState<CanalVenda[]>(CANAIS);
   const [carga, setCarga] = useState<Carga | null>(null);
+  const [recordes, setRecordes] = useState<Recorde[]>([]);
   const [erro, setErro] = useState<{ chave: string; texto: string } | null>(null);
 
   const periodo: Periodo = tipo === "personalizado" ? { tipo, ...datas } : periodoDoTipo(tipo, hoje);
@@ -36,6 +39,16 @@ export default function Vendas() {
     carregarLojas()
       .then((l) => !cancelado && setLojas(l))
       .catch((e) => !cancelado && setErro({ chave: "lojas", texto: (e as Error).message }));
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+    carregarRecordes()
+      .then((r) => !cancelado && setRecordes(r))
+      .catch(() => undefined); // sem as tabelas: segue sem o troféu
     return () => {
       cancelado = true;
     };
@@ -81,6 +94,22 @@ export default function Vendas() {
   // Aviso quando o período começa antes do histórico já carregado de alguma loja escolhida.
   const incompletas = periodo.de >= somarDiasData(hoje, -2) ? [] : lojasEscolhidas.filter((l) => !l.historicoDesde || l.historicoDesde > periodo.de);
 
+  // 🏆 quando o período é UM dia, sem filtro de canal, e esse dia é o recorde da loja (valor da loja inteira).
+  const vig = useMemo(() => vigentes(recordes), [recordes]);
+  const chavesLojas = lojasEscolhidas.map((l) => l.chave).join(",");
+  const trofeus = useMemo(() => {
+    const r: Record<string, { pedidos: boolean; faturamento: boolean }> = {};
+    if (!carga || periodo.de !== periodo.ate || canaisSel.length !== CANAIS.length) return r;
+    for (const l of lojasEscolhidas) {
+      if (!l.alertarRecordes) continue;
+      const t = somar(carga.atual.filter((x) => x.lojaChave === l.chave));
+      const e = recordesDoDia(vig, l.id, periodo.de, { pedidos: t.pedidos, faturamento: t.liquido });
+      if (e.pedidos || e.faturamento) r[l.chave] = e;
+    }
+    return r;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carga, vig, periodo.de, periodo.ate, canaisSel.length, chavesLojas]);
+
   const textoPeriodo = periodo.de === periodo.ate ? `${diaCurto(periodo.de)}/${periodo.de.slice(0, 4)}` : `${dataBR(periodo.de)} a ${dataBR(periodo.ate)}`;
   const erroTela = erro && (erro.chave === "lojas" || erro.chave === chave) ? erro.texto : null;
 
@@ -89,6 +118,8 @@ export default function Vendas() {
       <CabecalhoPagina titulo="Vendas" descricao={`Dia de caixa: ${textoPeriodo}. Todas as lojas do Xmenu, em um só lugar.`}>
         <SeletorPeriodo tipo={tipo} de={periodo.de} ate={periodo.ate} hoje={hoje} aoMudarTipo={setTipo} aoMudarDatas={(de, ate) => setDatas({ de, ate })} />
       </CabecalhoPagina>
+
+      <FaixaRecordes />
 
       {lojas && <FiltrosLojasCanais lojas={lojas} lojasSel={lojasAtivas} aoMudarLojas={setLojasSel} canaisSel={canaisSel} aoMudarCanais={setCanaisSel} />}
 
@@ -109,8 +140,8 @@ export default function Vendas() {
 
       {!erroTela && !carregando && lojas && (
         <div className="space-y-4">
-          <IndicadoresVendas atual={totais} anterior={totaisAnt} rotuloComparacao={anterior.rotulo} />
-          <TabelaLojas linhas={linhas} lojas={lojasEscolhidas} />
+          <IndicadoresVendas atual={totais} anterior={totaisAnt} rotuloComparacao={anterior.rotulo} recorde={lojasEscolhidas.length === 1 ? trofeus[lojasEscolhidas[0].chave] : undefined} />
+          <TabelaLojas linhas={linhas} lojas={lojasEscolhidas} recordes={trofeus} />
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="min-w-0 lg:col-span-2">
               <GraficoVendas linhas={linhas} de={periodo.de} ate={periodo.ate} lojas={lojasEscolhidas} canais={canaisSel} />

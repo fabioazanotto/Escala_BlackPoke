@@ -8,6 +8,7 @@ import { identidade } from "@/config/identidade";
 import { abaAtiva, abasConfiguracoes, destinoInicial, destinos, podeAcessar, rotasLargas, trilhas } from "@/config/menu";
 import { ROTULO_PERFIL } from "@/lib/acesso";
 import { Icone } from "@/components/Icones";
+import { AlertaRecordes } from "@/components/AlertaRecordes";
 import { useSessao } from "@/components/Sessao";
 
 function iniciais(nome: string): string {
@@ -194,6 +195,8 @@ export function Estrutura({ children }: { children: React.ReactNode }) {
           <span className="max-w-32 truncate text-sm font-medium">{perfil.nome}</span>
         </div>
       </header>
+
+      {perfil.perfil === "admin" && <AlertaRecordes />}
 
       <main className="p-4 lg:p-7">
         {liberado && abas && (

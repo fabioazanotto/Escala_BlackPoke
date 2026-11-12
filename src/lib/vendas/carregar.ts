@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import type { CanalVenda } from "@/lib/tipos";
 import type { LinhaVenda } from "./consulta";
 
-export type LojaVenda = { id: string; chave: string; nome: string; historicoDesde: string | null };
+export type LojaVenda = { id: string; chave: string; nome: string; historicoDesde: string | null; alertarRecordes: boolean };
 
 const PAGINA = 1000; // limite de linhas por consulta do Supabase
 
@@ -24,9 +24,9 @@ type LinhaBruta = {
 };
 
 export async function carregarLojas(): Promise<LojaVenda[]> {
-  const { data, error } = await supabase().from("lojas_xmenu").select("id, chave, nome, historico_desde").eq("ativa", true).order("nome");
+  const { data, error } = await supabase().from("lojas_xmenu").select("id, chave, nome, historico_desde, alertar_recordes").eq("ativa", true).order("nome");
   if (error) throw new Error(error.message);
-  return (data ?? []).map((l) => ({ id: l.id as string, chave: l.chave as string, nome: l.nome as string, historicoDesde: (l.historico_desde as string | null) ?? null }));
+  return (data ?? []).map((l) => ({ id: l.id as string, chave: l.chave as string, nome: l.nome as string, historicoDesde: (l.historico_desde as string | null) ?? null, alertarRecordes: l.alertar_recordes !== false }));
 }
 
 /** Todas as linhas do período, de todas as lojas (o filtro de lojas e canais é feito na tela). */
@@ -66,4 +66,37 @@ export async function carregarLinhas(de: string, ate: string, lojas: LojaVenda[]
     }
     if (lote.length < PAGINA) return todas;
   }
+}
+
+// ---------------------------------------------------------------- recordes
+
+import type { Recorde } from "./recordes";
+
+export async function carregarRecordes(): Promise<Recorde[]> {
+  const { data, error } = await supabase().from("vendas_recordes").select("id, loja_id, metrica, dia, valor, anterior, anterior_dia, alerta, detectado_em");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    lojaId: r.loja_id as string,
+    metrica: r.metrica as Recorde["metrica"],
+    dia: r.dia as string,
+    valor: Number(r.valor),
+    anterior: r.anterior === null ? null : Number(r.anterior),
+    anteriorDia: (r.anterior_dia as string | null) ?? null,
+    alerta: Boolean(r.alerta),
+    detectadoEm: r.detectado_em as string,
+  }));
+}
+
+/** Ids dos recordes que este admin já viu no pop-up ("popup") ou dispensou na faixa ("faixa"). */
+export async function carregarVistos(tipo: "popup" | "faixa"): Promise<Set<string>> {
+  const { data } = await supabase().from("vendas_recordes_vistos").select("recorde_id").eq("tipo", tipo);
+  return new Set((data ?? []).map((v) => v.recorde_id as string));
+}
+
+export async function marcarVistos(ids: string[], tipo: "popup" | "faixa"): Promise<void> {
+  const { data } = await supabase().auth.getUser();
+  const usuario = data.user?.id;
+  if (!usuario || ids.length === 0) return;
+  await supabase().from("vendas_recordes_vistos").upsert(ids.map((recorde_id) => ({ recorde_id, usuario_id: usuario, tipo })), { onConflict: "recorde_id,usuario_id,tipo", ignoreDuplicates: true });
 }

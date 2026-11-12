@@ -46,6 +46,9 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
 - Usuários (Configurações > Usuários, só admin; `/usuarios`): `src/lib/usuarios.ts` (regras, testadas), `src/lib/servidor/usuarios.ts` e rota `/api/usuarios` (chave de serviço). O admin cria usuário com senha temporária,
   muda perfil/unidades, inativa e redefine senha; a pessoa é obrigada a trocá-la no primeiro acesso (`user_metadata.trocar_senha`, tela em `src/components/TrocarSenha.tsx`).
   Senhas nunca vão para log, auditoria ou resposta da API. O admin não pode se inativar nem rebaixar, e sempre sobra um admin ativo.
+- Recordes de vendas (Vendas, só admin): melhor dia de caixa de cada loja em pedidos e em faturamento (`supabase/escala/15_vendas_recordes.sql`, `src/lib/vendas/recordes.ts`).
+  A função `vendas_atualizar_recordes` roda depois de cada sincronização das vendas; só recorde dos últimos 3 dias gera alerta (histórico antigo entra em silêncio). O ABC não alerta (`lojas_xmenu.alertar_recordes`).
+  Pop-up no login do admin (`src/components/AlertaRecordes.tsx`), faixa verde em Vendas até cada admin dispensar (`FaixaRecordes.tsx`) e 🏆 ao lado de pedidos e faturamento no dia do recorde.
 - Classes CSS prontas em `src/app/globals.css`: `.botao`, `.botao-secundario`, `.campo`, `.cartao`.
 - Documentação da API de ponto em `docs/api-ponto.md` e dados de exemplo em `docs/marcacoes-exemplo.json`.
 

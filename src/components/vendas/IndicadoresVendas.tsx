@@ -19,11 +19,18 @@ function Variacao({ atual, anterior, rotulo, altaEhBoa = true }: { atual: number
   );
 }
 
-function Cartao({ rotulo, valor, apoio, children }: { rotulo: string; valor: string; apoio?: string; children: React.ReactNode }) {
+function Cartao({ rotulo, valor, apoio, recorde, children }: { rotulo: string; valor: string; apoio?: string; recorde?: string; children: React.ReactNode }) {
   return (
     <div className="cartao">
       <p className="text-sm text-neutral-600">{rotulo}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{valor}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
+        {valor}
+        {recorde && (
+          <span role="img" aria-label={recorde} title={recorde} className="ml-1.5">
+            🏆
+          </span>
+        )}
+      </p>
       {apoio && <p className="text-xs text-neutral-600 tabular-nums">{apoio}</p>}
       {children}
     </div>
@@ -31,13 +38,13 @@ function Cartao({ rotulo, valor, apoio, children }: { rotulo: string; valor: str
 }
 
 /** Quatro números do período, cada um comparado com o período anterior. */
-export function IndicadoresVendas({ atual, anterior, rotuloComparacao }: { atual: Totais; anterior: Totais; rotuloComparacao: string }) {
+export function IndicadoresVendas({ atual, anterior, rotuloComparacao, recorde }: { atual: Totais; anterior: Totais; rotuloComparacao: string; recorde?: { pedidos: boolean; faturamento: boolean } }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <Cartao rotulo="Faturamento" valor={brl(atual.liquido)}>
+      <Cartao rotulo="Faturamento" valor={brl(atual.liquido)} recorde={recorde?.faturamento ? "Recorde de faturamento da loja" : undefined}>
         <Variacao atual={atual.liquido} anterior={anterior.liquido} rotulo={rotuloComparacao} />
       </Cartao>
-      <Cartao rotulo="Pedidos" valor={num(atual.pedidos)}>
+      <Cartao rotulo="Pedidos" valor={num(atual.pedidos)} recorde={recorde?.pedidos ? "Recorde de pedidos da loja" : undefined}>
         <Variacao atual={atual.pedidos} anterior={anterior.pedidos} rotulo={rotuloComparacao} />
       </Cartao>
       <Cartao rotulo="Ticket médio" valor={brl(atual.ticketMedio)}>

@@ -4,6 +4,7 @@ import { ambienteReal } from "@/lib/servidor/sincronizarVendas";
 import { supabaseAdmin } from "@/lib/servidor/supabaseAdmin";
 import { DIAS_HISTORICO_POR_RODADA, HISTORICO_DESDE } from "@/config/vendas";
 import { completarHistorico } from "@/lib/vendas/historico";
+import { hojeNoBrasil } from "@/lib/vendas/datas";
 import { sincronizarVendas, type Origem, type Pedido } from "@/lib/vendas/sincronizar";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,8 @@ export async function POST(request: Request) {
       return Response.json({ lojas, concluidoEm: new Date().toISOString() }, { headers: semCache });
     }
     const lojas = await sincronizarVendas(pedido, ambienteReal(db));
+    // Recordes: a função compara o melhor dia de cada loja com o recorde guardado. Falha aqui não atrapalha a atualização das vendas.
+    await db.rpc("vendas_atualizar_recordes", { p_hoje: hojeNoBrasil() }).then(() => undefined, () => undefined);
     return Response.json({ lojas, concluidoEm: new Date().toISOString() }, { headers: semCache });
   } catch (e) {
     return Response.json({ erro: (e as Error).message }, { status: 400, headers: semCache });

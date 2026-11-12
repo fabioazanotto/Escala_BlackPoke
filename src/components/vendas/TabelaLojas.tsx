@@ -7,14 +7,28 @@ import { COR_CANAL } from "./rotulosCanal";
 
 const TURNOS: LinhaVenda["periodo"][] = ["manha", "tarde", "noite", "indefinido"];
 
-function Celulas({ t }: { t: Totais }) {
+export type RecordeDoDia = { pedidos: boolean; faturamento: boolean };
+
+const Trofeu = ({ texto }: { texto: string }) => (
+  <span role="img" aria-label={texto} title={texto} className="ml-1">
+    🏆
+  </span>
+);
+
+function Celulas({ t, rec }: { t: Totais; rec?: RecordeDoDia }) {
   return (
     <>
-      <td className="px-3 py-2 text-right">{num(t.pedidos)}</td>
+      <td className="px-3 py-2 text-right">
+        {num(t.pedidos)}
+        {rec?.pedidos && <Trofeu texto="Recorde de pedidos da loja" />}
+      </td>
       <td className="px-3 py-2 text-right">{brl(t.bruto)}</td>
       <td className="px-3 py-2 text-right">{t.descontos > 0 ? `− ${brl(t.descontos)}` : brl(0)}</td>
       <td className="px-3 py-2 text-right">{brl(t.taxaEntrega)}</td>
-      <td className="px-3 py-2 text-right font-semibold">{brl(t.liquido)}</td>
+      <td className="px-3 py-2 text-right font-semibold">
+        {brl(t.liquido)}
+        {rec?.faturamento && <Trofeu texto="Recorde de faturamento da loja" />}
+      </td>
       <td className="px-3 py-2 text-right">{brl(t.ticketMedio)}</td>
       <td className="px-3 py-2 text-right">{num(t.cancelados)}</td>
     </>
@@ -22,14 +36,14 @@ function Celulas({ t }: { t: Totais }) {
 }
 
 /** Uma linha por loja, com total; toque na loja abre o detalhe por canal e por turno. */
-export function TabelaLojas({ linhas, lojas }: { linhas: LinhaVenda[]; lojas: { chave: string; nome: string }[] }) {
+export function TabelaLojas({ linhas, lojas, recordes = {} }: { linhas: LinhaVenda[]; lojas: { chave: string; nome: string }[]; recordes?: Record<string, RecordeDoDia> }) {
   const [aberta, setAberta] = useState<string | null>(null);
   const porLoja = agruparPor(linhas, (l) => l.lojaChave);
 
   return (
     <div className="cartao">
       <h2 className="text-base font-semibold">Resultado por loja</h2>
-      <p className="mt-0.5 text-xs text-neutral-500">Toque em uma loja para ver o detalhe por canal e por turno.</p>
+      <p className="mt-0.5 text-xs text-neutral-500">Toque em uma loja para ver o detalhe por canal e por turno.{Object.keys(recordes).length > 0 && " 🏆 = recorde da loja (melhor dia de caixa desde 01/01/2026)."}</p>
 
       <div className="-mx-4 mt-3 overflow-x-auto lg:-mx-5">
         <table className="w-full min-w-[760px] text-sm tabular-nums">
@@ -63,7 +77,7 @@ export function TabelaLojas({ linhas, lojas }: { linhas: LinhaVenda[]; lojas: { 
                         {loja.nome.replace("BlackPoke ", "")}
                       </button>
                     </td>
-                    <Celulas t={t} />
+                    <Celulas t={t} rec={recordes[loja.chave]} />
                   </tr>
                   {abre && (
                     <>
