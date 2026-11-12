@@ -3,7 +3,7 @@
 export const PERFIS = ["admin", "rh", "gerencia"] as const;
 export type PerfilUsuario = (typeof PERFIS)[number];
 
-export const SENHA_MINIMA = 10;
+export const SENHA_MINIMA = 8;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const ehUuid = (s: unknown): s is string => typeof s === "string" && UUID.test(s);
@@ -15,7 +15,7 @@ export function validarEmail(email: unknown): string | null {
   return null;
 }
 
-/** Senha: pelo menos 10 caracteres, com letra e número, e sem espaço no começo ou no fim. */
+/** Senha: pelo menos 8 caracteres, com letra e número, e sem espaço no começo ou no fim. */
 export function validarSenha(senha: unknown): string | null {
   if (typeof senha !== "string") return "Informe a senha.";
   if (senha.length < SENHA_MINIMA) return `A senha precisa ter pelo menos ${SENHA_MINIMA} caracteres.`;
@@ -38,7 +38,7 @@ function sorteio(n: number): number {
 }
 
 /** Senha aleatória fácil de ler e digitar no celular (sem letras e números que se confundem). Sempre passa em validarSenha. */
-export function gerarSenha(tamanho = 14): string {
+export function gerarSenha(tamanho = 12): string {
   const todos = MAIUSCULAS + MINUSCULAS + NUMEROS;
   const n = Math.max(tamanho, SENHA_MINIMA);
   const chars = [MAIUSCULAS[sorteio(MAIUSCULAS.length)], MINUSCULAS[sorteio(MINUSCULAS.length)], NUMEROS[sorteio(NUMEROS.length)]];

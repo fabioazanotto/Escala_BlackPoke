@@ -11,8 +11,8 @@ describe("senha e e-mail", () => {
     expect(validarEmail(42)).not.toBeNull();
   });
   it("senha: mínimo, letras e números, sem espaço nas pontas", () => {
-    expect(validarSenha("Abcdefghi1")).toBeNull();
-    expect(validarSenha("curta1A")).toContain("pelo menos 10");
+    expect(validarSenha("Abcdefg1")).toBeNull(); // 8 caracteres: o mínimo
+    expect(validarSenha("Abcdef1")).toContain("pelo menos 8"); // 7 caracteres
     expect(validarSenha("somente-letras-aqui")).toContain("letras e números");
     expect(validarSenha("1234567890123")).toContain("letras e números");
     expect(validarSenha(" Abcdefghi12")).toContain("espaço");
@@ -22,13 +22,13 @@ describe("senha e e-mail", () => {
     const vistas = new Set<string>();
     for (let i = 0; i < 200; i++) {
       const s = gerarSenha();
-      expect(s).toHaveLength(14);
+      expect(s).toHaveLength(12);
       expect(validarSenha(s)).toBeNull();
       expect(s).not.toMatch(/[0O1lI]/);
       vistas.add(s);
     }
     expect(vistas.size).toBe(200);
-    expect(gerarSenha(4)).toHaveLength(10); // nunca abaixo do mínimo
+    expect(gerarSenha(4)).toHaveLength(8); // nunca abaixo do mínimo
   });
 });
 

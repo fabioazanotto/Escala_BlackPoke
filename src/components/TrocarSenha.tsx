@@ -49,7 +49,7 @@ export function TrocarSenha({ obrigatorio, aoSair }: { obrigatorio?: boolean; ao
       <label className="flex items-center gap-2 text-sm text-neutral-700">
         <input type="checkbox" className="h-5 w-5" checked={ver} onChange={(e) => setVer(e.target.checked)} /> mostrar a senha
       </label>
-      <p className="text-sm text-neutral-600">Pelo menos 10 caracteres, com letras e números.</p>
+      <p className="text-sm text-neutral-600">Pelo menos 8 caracteres, com letras e números.</p>
       {erro && <p className="rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
       {ok && <p className="rounded-xl bg-green-50 p-3 text-green-900">Senha alterada. Use a nova senha no próximo acesso.</p>}
       <button className="botao w-full" type="submit" disabled={salvando}>

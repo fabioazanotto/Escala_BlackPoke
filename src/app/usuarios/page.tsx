@@ -33,7 +33,7 @@ function CampoSenha({ valor, aoMudar }: { valor: string; aoMudar: (s: string) =>
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
-        <input className="campo" type={ver ? "text" : "password"} autoComplete="new-password" value={valor} onChange={(e) => aoMudar(e.target.value)} placeholder="Mínimo de 10 caracteres, com letras e números" />
+        <input className="campo" type={ver ? "text" : "password"} autoComplete="new-password" value={valor} onChange={(e) => aoMudar(e.target.value)} placeholder="Mínimo de 8 caracteres, com letras e números" />
         <button type="button" className="botao-secundario whitespace-nowrap" onClick={() => { aoMudar(gerarSenha()); setVer(true); }}>
           Gerar
         </button>
