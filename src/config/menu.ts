@@ -46,18 +46,19 @@ export const destinos: Destino[] = [
     rotulo: "Configurações",
     href: "/unidades",
     icone: "configuracoes",
-    rotas: ["/unidades", "/funcoes", "/horarios", "/regras", "/regras-da-unidade"],
+    rotas: ["/unidades", "/funcoes", "/horarios", "/regras", "/regras-da-unidade", "/usuarios"],
     perfis: ["rh", "gerencia", "admin"],
   },
 ];
 
 // Abas dentro de Configurações.
-export const abasConfiguracoes: { rotulo: string; href: string }[] = [
+export const abasConfiguracoes: { rotulo: string; href: string; somenteAdmin?: boolean }[] = [
   { rotulo: "Unidades", href: "/unidades" },
   { rotulo: "Funções", href: "/funcoes" },
   { rotulo: "Horários", href: "/horarios" },
   { rotulo: "Regras e feriados", href: "/regras" },
   { rotulo: "Regras da unidade", href: "/regras-da-unidade" },
+  { rotulo: "Usuários", href: "/usuarios", somenteAdmin: true },
 ];
 
 // Caminho mostrado na barra superior.
@@ -77,6 +78,8 @@ export const trilhas: Record<string, string[]> = {
   "/horarios": ["Configurações", "Horários"],
   "/regras": ["Configurações", "Regras e feriados"],
   "/regras-da-unidade": ["Configurações", "Regras da unidade"],
+  "/usuarios": ["Configurações", "Usuários"],
+  "/minha-conta": ["Minha conta"],
 };
 
 // Telas que usam a largura toda da área útil. As demais ficam numa coluna mais estreita.

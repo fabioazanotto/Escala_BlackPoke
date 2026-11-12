@@ -43,6 +43,9 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).
   Regras por unidade (folga fixa, alternância, dobra, dia sem funcionamento) ficam em `regras_unidade`, são criadas só pelo RH em
   `/regras-da-unidade` e aplicadas pelo motor (`src/lib/escala/regras.ts`). Dobra é exceção ao turno fixo e aparece como "Dobra" na escala.
+- Usuários (Configurações > Usuários, só admin; `/usuarios`): `src/lib/usuarios.ts` (regras, testadas), `src/lib/servidor/usuarios.ts` e rota `/api/usuarios` (chave de serviço). O admin cria usuário com senha temporária,
+  muda perfil/unidades, inativa e redefine senha; a pessoa é obrigada a trocá-la no primeiro acesso (`user_metadata.trocar_senha`, tela em `src/components/TrocarSenha.tsx`).
+  Senhas nunca vão para log, auditoria ou resposta da API. O admin não pode se inativar nem rebaixar, e sempre sobra um admin ativo.
 - Classes CSS prontas em `src/app/globals.css`: `.botao`, `.botao-secundario`, `.campo`, `.cartao`.
 - Documentação da API de ponto em `docs/api-ponto.md` e dados de exemplo em `docs/marcacoes-exemplo.json`.
 

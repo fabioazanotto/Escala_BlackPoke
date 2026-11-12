@@ -95,6 +95,9 @@ function BarraLateral({ aoNavegar }: { aoNavegar?: () => void }) {
             <p className="text-xs text-neutral-600">{ROTULO_PERFIL[perfil.perfil]}</p>
           </div>
         </div>
+        <Link href="/minha-conta" onClick={aoNavegar} className="mb-2 block rounded-lg px-3 py-2 text-center text-sm text-neutral-700 hover:bg-neutral-50">
+          Alterar minha senha
+        </Link>
         <button className="botao-secundario w-full" onClick={sair}>
           Sair
         </button>
@@ -136,7 +139,7 @@ export function Estrutura({ children }: { children: React.ReactNode }) {
 
   const trilha = trilhas[caminho] ?? [];
   const larga = rotasLargas.includes(caminho);
-  const abas = abasConfiguracoes.some((a) => abaAtiva(a.href, caminho)) ? { lista: abasConfiguracoes, rotulo: "Configurações" } : null;
+  const abas = abasConfiguracoes.some((a) => abaAtiva(a.href, caminho)) ? { lista: abasConfiguracoes.filter((a) => !a.somenteAdmin || perfil.perfil === "admin"), rotulo: "Configurações" } : null;
   const liberado = podeAcessar(perfil.perfil, caminho);
 
   return (

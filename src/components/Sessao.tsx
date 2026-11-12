@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, variaveisConfiguradas } from "@/lib/supabase";
 import { identidade } from "@/config/identidade";
+import { TrocarSenha } from "@/components/TrocarSenha";
 import type { Perfil } from "@/lib/tipos";
 
 type Contexto = { perfil: Perfil; sair: () => Promise<void> };
@@ -26,6 +27,7 @@ function traduzirErro(mensagem: string): string {
 function TelaLogin() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [verSenha, setVerSenha] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
 
@@ -62,12 +64,15 @@ function TelaLogin() {
           <span className="mb-1 block font-medium">Senha</span>
           <input
             className="campo"
-            type="password"
+            type={verSenha ? "text" : "password"}
             autoComplete="current-password"
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             required
           />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <input type="checkbox" className="h-5 w-5" checked={verSenha} onChange={(e) => setVerSenha(e.target.checked)} /> mostrar a senha
         </label>
         {erro && <p className="rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
         <button type="submit" className="botao w-full" disabled={entrando}>
@@ -157,6 +162,16 @@ export function Sessao({ children }: { children: React.ReactNode }) {
         <button className="botao-secundario w-full" onClick={sair}>
           Sair
         </button>
+      </main>
+    );
+  }
+
+  // Primeiro acesso (ou senha redefinida pelo admin): só segue depois de definir uma senha própria.
+  if (sessao.user.user_metadata?.trocar_senha === true) {
+    return (
+      <main className="mx-auto w-full max-w-sm flex-1 space-y-4 px-4 py-10">
+        <h1 className="text-center text-3xl font-bold">{identidade.nome}</h1>
+        <TrocarSenha obrigatorio aoSair={sair} />
       </main>
     );
   }
