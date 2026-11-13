@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { COLUNAS_OFICIAIS, dataBR, montarCsv, observacoesDoDia } from "@/lib/ponto/csv";
 import { duracao, type DiaMes } from "@/lib/ponto/mes";
 import type { FuncionarioDaLista, MesDoColaborador } from "@/lib/ponto/mesTipos";
+import { CartaoPonto } from "@/components/ponto/CartaoPonto";
+import { chamar } from "@/components/ponto/chamar";
 import { HistoricoColaborador } from "@/components/ponto/HistoricoColaborador";
 import { useSessao } from "@/components/Sessao";
-import { supabase } from "@/lib/supabase";
 import { hojeNoBrasil } from "@/lib/vendas/datas";
 
 type Selo = { texto: string; classe: string; marca: string };
@@ -47,16 +48,6 @@ const somarMeses = (mes: string, n: number) => {
 };
 const nomeMes = (mes: string) => new Date(`${mes}-01T00:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }).replace(/^./, (c) => c.toUpperCase());
 
-async function chamar<T>(caminho: string): Promise<T> {
-  const { data } = await supabase().auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error("Sessão expirada. Entre de novo.");
-  const r = await fetch(caminho, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-  const json = (await r.json().catch(() => ({}))) as T & { erro?: string };
-  if (!r.ok) throw new Error(r.status === 504 ? "O servidor demorou demais (504). Tente de novo." : (json.erro ?? `Falha ${r.status}`));
-  return json;
-}
-
 function Cartao({ rotulo, valor, apoio, alerta }: { rotulo: string; valor: string; apoio?: string; alerta?: boolean }) {
   return (
     <div className={`rounded-xl border p-3 ${alerta ? "border-amber-300 bg-amber-50" : "border-neutral-200 bg-white"}`}>
@@ -78,7 +69,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
   const [carregando, setCarregando] = useState(false);
   const [oficial, setOficial] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(inicialFuncionario === null);
-  const [visao, setVisao] = useState<"mes" | "historico">("mes");
+  const [visao, setVisao] = useState<"mes" | "historico" | "cartao">("mes");
   const { perfil } = useSessao();
 
   useEffect(() => {
@@ -215,7 +206,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
 
       {selecionado && !mostrarLista && (
         <div role="tablist" aria-label="O que ver" className="nao-imprimir flex gap-1 border-b border-neutral-200">
-          {([["mes", "Mês"], ["historico", "Histórico"]] as const).map(([v, rot]) => (
+          {([["mes", "Mês"], ["historico", "Histórico"], ["cartao", "Cartão ponto"]] as const).map(([v, rot]) => (
             <button key={v} type="button" role="tab" aria-selected={visao === v} onClick={() => setVisao(v)} className={`-mb-px border-b-2 px-4 py-2.5 text-sm ${visao === v ? "border-neutral-900 font-semibold" : "border-transparent text-neutral-600 hover:text-neutral-900"}`}>
               {rot}
             </button>
@@ -226,6 +217,8 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
       {selecionado && !mostrarLista && visao === "historico" && (
         <HistoricoColaborador funcionarioId={selecionado.id} nome={selecionado.nome} colaboradorId={dados?.funcionario.id === selecionado.id ? (dados.colaborador?.id ?? null) : null} mesAtual={mes} dadosDoMes={dados?.funcionario.id === selecionado.id ? dados : null} quemLanca={perfil.nome} />
       )}
+
+      {selecionado && !mostrarLista && visao === "cartao" && <CartaoPonto funcionarioId={selecionado.id} mes={mes} nome={selecionado.nome} />}
 
       {erro && <p className="nao-imprimir rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
       {carregando && !mostrarLista && visao === "mes" && <p className="text-sm text-neutral-600">Carregando o mês no Secullum…</p>}

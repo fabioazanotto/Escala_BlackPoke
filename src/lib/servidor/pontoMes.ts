@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { LOJAS_XMENU } from "@/config/lojas";
 import { ErroSecullum, valorDoCampo } from "@/lib/integracoes/secullum";
 import { agoraNoBrasil, diaDeTrabalho, jornadaDe, type Jornada } from "@/lib/ponto/aoVivo";
+import { montarCabecalho, type CabecalhoCartao } from "@/lib/ponto/cartao";
 import { mascararCpf } from "@/lib/ponto/conferencia";
 import { montarMes, parseCalcular, pontosDeAtencao, ultimoDiaDoMes, type DiaEscala, type InfoDiaSecullum } from "@/lib/ponto/mes";
 import { somarDiasData } from "@/lib/vendas/datas";
@@ -127,6 +128,16 @@ export async function montarMesDoColaborador(db: SupabaseClient, funcionarioId: 
     }
   }
 
+  // Alterações do mês (para o cartão ponto): batida lançada à mão (I) ou desconsiderada (D), com o motivo informado no Secullum.
+  const alteracoes = lista(dados.fonte)
+    .filter((r) => Number(valorDoCampo(r, "FuncionarioId")) === f.id)
+    .flatMap((r) => {
+      const tipo = Number(valorDoCampo(r, "Tipo"));
+      const dia = texto(valorDoCampo(r, "Data")).slice(0, 10);
+      if ((tipo !== 1 && tipo !== 3) || dia < primeiro || dia > ultimo) return [];
+      return [{ dia, hora: texto(valorDoCampo(r, "Hora")).slice(0, 5), tipo: tipo === 1 ? ("I" as const) : ("D" as const), motivo: texto(valorDoCampo(r, "Motivo")).trim() }];
+    });
+
   const calc = "r" in dados.calculo && dados.calculo.r ? parseCalcular(dados.calculo.r) : null;
   const { dias, resumo } = montarMes({
     mes, hoje, agoraMin, registros, agrupadas, escala,
@@ -144,6 +155,23 @@ export async function montarMesDoColaborador(db: SupabaseClient, funcionarioId: 
     dias,
     resumo,
     atencao: pontosDeAtencao(dias, resumo, escala !== null),
+    alteracoes,
     atualizadoEm: new Date().toISOString(),
   };
+}
+
+/**
+ * Cabeçalho do Cartão Ponto (empresa, função, CPF completo...). O CPF completo só sai aqui, para o admin, na hora de imprimir:
+ * nunca é guardado nem registrado em log. Só funcionários das empresas incluídas no projeto.
+ */
+export async function cabecalhoDoCartao(db: SupabaseClient, funcionarioId: number): Promise<CabecalhoCartao> {
+  const { contexto, empresasApi } = await comCache("contexto", 10 * 60000, () => carregarContexto(db));
+  const { sessao, empresas } = contexto;
+  const [funcsBrutos, horariosBrutos] = await Promise.all([comCache("funcionarios", 10 * 60000, () => sessao.obter("Funcionarios")), comCache("horarios", 10 * 60000, () => sessao.obter("Horarios"))]);
+  const funcionario = lista(funcsBrutos).find((x) => Number(valorDoCampo(x, "Id")) === funcionarioId);
+  const empresaId = Number(valorDoCampo(funcionario, "EmpresaId"));
+  if (!funcionario || !empresas.some((e) => e.empresaId === empresaId)) throw new ErroMes("Funcionário não encontrado nas empresas do projeto.");
+  const empresa = empresasApi.find((e) => Number(valorDoCampo(e, "Id")) === empresaId);
+  const horario = lista(horariosBrutos).find((h) => Number(valorDoCampo(h, "Id")) === Number(valorDoCampo(funcionario, "HorarioId")));
+  return montarCabecalho({ funcionario, empresa, horario });
 }

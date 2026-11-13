@@ -38,6 +38,8 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   "Ponto por colaborador": escolhe-se a unidade (botões) e aparecem os colaboradores ativos dela como botões; tocar abre o mês.
   Histórico do colaborador (aba "Histórico" em Ponto por colaborador, só admin; tabela `ocorrencias_colaborador`, SQL em `supabase/escala/17_historico_colaborador.sql`; lógica em `src/lib/ponto/historico.ts`):
   faltas e atrasos guardados do mês (botão explícito; só dias escalados e encerrados) e lançamentos manuais (atestado só com datas, nunca CID; advertência; observação). Chave: código do funcionário no Secullum.
+  Cartão Ponto (aba "Cartão ponto" em Ponto por colaborador, só admin): cópia no layout do Secullum (A4 paisagem, impressão pelo navegador), feita de `Calcular` + batidas lidas (`src/lib/ponto/cartao.ts`, rota `GET /api/ponto/cartao`).
+  Mostra CPF completo e demais dados do cabeçalho lidos na hora (nunca guardados nem em log); C.T.P.S. só sai se o cadastro do Secullum trouxer. Não usa o canal interno de relatórios do Secullum (ver `docs/secullum-api.md`).
   "Creator" (dono do sistema): marcador `app_metadata.creator = true` no login (SQL em `supabase/escala/16_creator.sql`; o usuário não consegue se promover). `useSessao().creator` (admin + marcador).
   RH > "Integração colaboradores" (`/integracao-colaboradores`, kit de boas-vindas por cargo): só o creator vê a página em construção; os demais veem "Em breve".
   A aba "Integração do ponto" (`/ponto-integracao`, em Configurações, só admin) reúne sincronização, conferência de funcionários, teste de conexão e "Nome completo e empresa pelo Secullum"

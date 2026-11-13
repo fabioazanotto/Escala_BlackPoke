@@ -16,7 +16,7 @@ describe("CSV do mês", () => {
     funcionario: { id: 1, nome: "Maria; da Silva", empresa: "Empresa X", lojaChave: "santos", loja: "BlackPoke Santos", cpfMascarado: "***.456.789-**", admissao: null, demissao: null, ativo: true },
     colaborador: null, mes: "2026-11", escala: { existe: false, status: null },
     oficial: { colunas: ["Data", "Normais", "Faltas", "Atras."], totais: { Normais: "07:10", Faltas: "00:00", "Atras.": "00:10" } },
-    avisoOficial: null, dias, resumo, atencao: [], atualizadoEm: "x",
+    avisoOficial: null, dias, resumo, atencao: [], alteracoes: [], atualizadoEm: "x",
   };
 
   it("começa com BOM, protege ponto e vírgula nos campos e traz as colunas do Secullum", () => {

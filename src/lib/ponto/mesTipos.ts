@@ -14,5 +14,6 @@ export type MesDoColaborador = {
   dias: DiaMes[];
   resumo: ResumoMes;
   atencao: string[];
+  alteracoes: { dia: string; hora: string; tipo: "I" | "D"; motivo: string }[]; // batida incluída (I) ou desconsiderada (D), com o motivo
   atualizadoEm: string;
 };
