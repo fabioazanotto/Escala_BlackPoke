@@ -315,7 +315,7 @@ export function VisaoAoVivo() {
           {visao === "escala" && lojaSel === null && painel.semVinculo.length > 0 && (
             <section className="cartao space-y-2">
               <h2 className="text-lg font-semibold">Escalados sem vínculo com o Secullum ({painel.semVinculo.length})</h2>
-              <p className="text-sm text-neutral-600">Não dá para saber se chegaram. Faça o vínculo em RH &gt; Integração do ponto &gt; Conferir funcionários.</p>
+              <p className="text-sm text-neutral-600">Não dá para saber se chegaram. Faça o vínculo em Configurações &gt; Integração do ponto &gt; Conferir funcionários.</p>
               <ul className="text-sm">
                 {painel.semVinculo.map((p) => (
                   <li key={p.chave} className="border-t border-neutral-100 py-1.5">

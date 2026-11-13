@@ -18,7 +18,7 @@ export default function PontoPorColaborador() {
   const { perfil } = useSessao();
   return (
     <div>
-      <CabecalhoPagina titulo="Ponto por colaborador" descricao="O mês de um colaborador: batidas, faltas, atrasos e batidas faltando. Dados do Secullum, só leitura." />
+      <CabecalhoPagina titulo="Ponto por colaborador" descricao="Todos os colaboradores por empresa, com a situação de agora. Toque em um nome para ver o mês: batidas, faltas, atrasos, histórico e cartão ponto. Dados do Secullum, só leitura." />
       {!ehAdmin(perfil) ? (
         <section className="cartao max-w-3xl">
           <p className="text-neutral-700">Esta tela está em preparação e, por enquanto, só administradores têm acesso.</p>

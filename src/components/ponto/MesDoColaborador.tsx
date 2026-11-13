@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { COLUNAS_OFICIAIS, dataBR, montarCsv, observacoesDoDia } from "@/lib/ponto/csv";
 import { duracao, type DiaMes } from "@/lib/ponto/mes";
 import type { FuncionarioDaLista, MesDoColaborador } from "@/lib/ponto/mesTipos";
+import { ListaColaboradoresPonto } from "@/components/ponto/ListaColaboradoresPonto";
 import { CartaoPonto } from "@/components/ponto/CartaoPonto";
 import { chamar } from "@/components/ponto/chamar";
 import { HistoricoColaborador } from "@/components/ponto/HistoricoColaborador";
@@ -60,8 +61,6 @@ function Cartao({ rotulo, valor, apoio, alerta }: { rotulo: string; valor: strin
 
 export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inicialFuncionario: number | null; inicialMes: string | null }) {
   const [lista, setLista] = useState<FuncionarioDaLista[] | null>(null);
-  const [lojaSel, setLojaSel] = useState<string | null>(null);
-  const [desligados, setDesligados] = useState(false);
   const [funcionarioId, setFuncionarioId] = useState<number | null>(inicialFuncionario);
   const [mes, setMes] = useState(inicialMes ?? hojeNoBrasil().slice(0, 7));
   const [dados, setDados] = useState<MesDoColaborador | null>(null);
@@ -105,28 +104,11 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
     return () => clearTimeout(t);
   }, [funcionarioId, mes, carregar]);
 
-  const lojas = useMemo(() => {
-    const m = new Map<string, { nome: string; ativos: number }>();
-    for (const f of lista ?? []) {
-      if (!f.lojaChave) continue;
-      const atual = m.get(f.lojaChave) ?? { nome: f.loja, ativos: 0 };
-      if (f.ativo) atual.ativos += 1;
-      m.set(f.lojaChave, atual);
-    }
-    return [...m.entries()];
-  }, [lista]);
   const selecionado = (lista ?? []).find((f) => f.id === funcionarioId) ?? null;
-  const lojaEfetiva = lojaSel ?? selecionado?.lojaChave ?? null;
-  const doLoja = (lista ?? [])
-    .filter((f) => f.lojaChave === lojaEfetiva && (desligados || f.ativo))
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
-  function escolherLoja(chave: string) {
-    setLojaSel(chave);
-    setMostrarLista(true);
-  }
-  function escolherColaborador(id: number) {
+  function abrir(id: number) {
     setFuncionarioId(id);
+    setVisao("mes");
     setMostrarLista(false);
   }
 
@@ -146,63 +128,33 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
 
   return (
     <div className="space-y-4">
-      <div className="nao-imprimir space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-sm text-neutral-600">Unidade</span>
-          {lojas.map(([chave, l]) => (
-            <button key={chave} type="button" aria-pressed={lojaEfetiva === chave} onClick={() => escolherLoja(chave)} className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium ${lojaEfetiva === chave ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"}`}>
-              {l.nome.replace("BlackPoke ", "")}
-              <span className={`text-xs ${lojaEfetiva === chave ? "text-neutral-300" : "text-neutral-500"}`}>{l.ativos}</span>
-            </button>
-          ))}
-          {!lista && !erro && <span className="text-sm text-neutral-600">Carregando…</span>}
-        </div>
+      {mostrarLista && <ListaColaboradoresPonto funcionarios={lista} onAbrir={abrir} erroLista={funcionarioId === null ? erro : null} />}
 
-        {selecionado && !mostrarLista ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm text-neutral-700">
-              Colaborador: <strong>{selecionado.nome}</strong>
-            </p>
-            <button type="button" className="botao-secundario !px-3 !py-2" onClick={() => setMostrarLista(true)}>
-              Trocar colaborador
-            </button>
-            <div className="ml-auto flex items-center gap-1">
-              <button className="botao-secundario !px-3 !py-2" aria-label="Mês anterior" onClick={() => setMes(somarMeses(mes, -1))}>
-                ‹
-              </button>
-              <span className="min-w-[10rem] text-center text-sm font-semibold">{nomeMes(mes)}</span>
-              <button className="botao-secundario !px-3 !py-2" aria-label="Próximo mês" onClick={() => setMes(somarMeses(mes, 1))}>
-                ›
-              </button>
-            </div>
-          </div>
-        ) : lojaEfetiva ? (
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-sm text-neutral-600">{doLoja.length === 1 ? "1 colaborador" : `${doLoja.length} colaboradores`}{desligados ? "" : " ativos"}. Toque em um nome para abrir o ponto.</p>
-              <label className="ml-auto flex items-center gap-2 text-sm text-neutral-700">
-                <input type="checkbox" className="h-5 w-5" checked={desligados} onChange={(e) => setDesligados(e.target.checked)} /> incluir desligados
-              </label>
-            </div>
-            {doLoja.length === 0 ? (
-              <p className="text-neutral-600">Nenhum colaborador {desligados ? "" : "ativo "}nesta unidade.</p>
+      {!mostrarLista && (
+        <div className="nao-imprimir flex flex-wrap items-center gap-2">
+          <button type="button" className="botao-secundario !px-3 !py-2" onClick={() => setMostrarLista(true)}>
+            ← Voltar à lista
+          </button>
+          <p className="text-sm text-neutral-700">
+            {selecionado ? (
+              <>
+                Colaborador: <strong>{selecionado.nome}</strong>
+              </>
             ) : (
-              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {doLoja.map((f) => (
-                  <li key={f.id}>
-                    <button type="button" aria-pressed={f.id === funcionarioId} onClick={() => escolherColaborador(f.id)} className={`flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium ${f.id === funcionarioId ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50"}`}>
-                      <span className="break-words">{f.nome}</span>
-                      {!f.ativo && <span className="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700">desligado</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              "Carregando…"
             )}
+          </p>
+          <div className="ml-auto flex items-center gap-1">
+            <button className="botao-secundario !px-3 !py-2" aria-label="Mês anterior" onClick={() => setMes(somarMeses(mes, -1))}>
+              ‹
+            </button>
+            <span className="min-w-[10rem] text-center text-sm font-semibold">{nomeMes(mes)}</span>
+            <button className="botao-secundario !px-3 !py-2" aria-label="Próximo mês" onClick={() => setMes(somarMeses(mes, 1))}>
+              ›
+            </button>
           </div>
-        ) : (
-          lista && <p className="text-neutral-600">Escolha uma unidade para ver os colaboradores.</p>
-        )}
-      </div>
+        </div>
+      )}
 
       {selecionado && !mostrarLista && (
         <div role="tablist" aria-label="O que ver" className="nao-imprimir flex gap-1 border-b border-neutral-200">
@@ -220,7 +172,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
 
       {selecionado && !mostrarLista && visao === "cartao" && <CartaoPonto funcionarioId={selecionado.id} mes={mes} nome={selecionado.nome} />}
 
-      {erro && <p className="nao-imprimir rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
+      {erro && !mostrarLista && <p className="nao-imprimir rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
       {carregando && !mostrarLista && visao === "mes" && <p className="text-sm text-neutral-600">Carregando o mês no Secullum…</p>}
 
       {dados && r && !carregando && !mostrarLista && visao === "mes" && (

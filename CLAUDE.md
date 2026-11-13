@@ -35,7 +35,8 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   Tela "Ponto por colaborador" (`/ponto/colaborador`, só admin): mês de um funcionário (`src/lib/ponto/mes.ts`, `src/lib/servidor/pontoMes.ts`, rotas `GET /api/ponto/colaborador` e `/api/ponto/funcionarios`);
   lê o Secullum na hora e mostra, lado a lado, a leitura do BlackPoke (escala x batidas) e o cálculo oficial (`Calcular`); exporta CSV e imprime. Sem escala no mês, o app NÃO declara faltas.
   O menu do RH fica na barra lateral (subitens em `src/config/menu.ts`); só Configurações ainda usa abas no topo.
-  "Ponto por colaborador": escolhe-se a unidade (botões) e aparecem os colaboradores ativos dela como botões; tocar abre o mês.
+  "Ponto por colaborador": abre numa lista de todos os colaboradores por empresa (ordem alfabética), com a situação de agora (trabalhando, em intervalo, atrasado, ausente, justificado, fora do horário),
+  vinda da mesma classificação da tela "Ponto ao vivo" (`src/lib/ponto/lista.ts`, `ListaColaboradoresPonto.tsx`; atualiza a cada minuto); busca por nome e filtro por loja. Tocar no nome abre o mês; "← Voltar à lista" volta.
   Histórico do colaborador (aba "Histórico" em Ponto por colaborador, só admin; tabela `ocorrencias_colaborador`, SQL em `supabase/escala/17_historico_colaborador.sql`; lógica em `src/lib/ponto/historico.ts`):
   faltas e atrasos guardados do mês (botão explícito; só dias escalados e encerrados) e lançamentos manuais (atestado só com datas, nunca CID; advertência; observação). Chave: código do funcionário no Secullum.
   Cartão Ponto (aba "Cartão ponto" em Ponto por colaborador, só admin): cópia no layout do Secullum (A4 paisagem, impressão pelo navegador), feita de `Calcular` + batidas lidas (`src/lib/ponto/cartao.ts`, rota `GET /api/ponto/cartao`).
