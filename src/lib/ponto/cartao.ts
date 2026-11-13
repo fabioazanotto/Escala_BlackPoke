@@ -3,6 +3,7 @@
 // Não é o documento assinado do Secullum: é uma cópia para conferência.
 
 import { valorDoCampo } from "@/lib/integracoes/secullum";
+import { posicionar } from "./aoVivo";
 import type { DiaMes } from "./mes";
 import type { MesDoColaborador } from "./mesTipos";
 
@@ -115,7 +116,7 @@ const ver = (v: string | undefined) => (preenchido(v) ? v!.trim() : "");
 /** Uma célula de batida: o que o Secullum calculou; "*" quando é batida lançada manualmente. */
 function celulaBatida(d: DiaMes, i: number): string {
   const oficial = d.oficial?.[COLUNAS_BATIDA[i]]?.trim();
-  const b = d.batidas[i];
+  const b = posicionar(d.batidas, d.retornoEmAberto)[i];
   if (!d.oficial) return b ? b.hora.slice(0, 5) + (b.manual ? "*" : "") : "";
   if (!oficial) return "";
   if (!HORA.test(oficial)) return oficial; // texto do Secullum (ex.: FOLGA, justificativa)

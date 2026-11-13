@@ -4,11 +4,12 @@
 
 import { somarDiasData } from "@/lib/vendas/datas";
 import { DIA_DE_TRABALHO_VIRA_AS } from "@/config/ponto";
-import { PARAMETROS_PADRAO, ROTULO_SITUACAO, batidasDoDia, classificar, deMinutos, paraMinutos, type Avaliacao, type Jornada, type Parametros } from "./aoVivo";
+import { PARAMETROS_PADRAO, ROTULO_SITUACAO, batidasDoDia, classificar, deMinutos, inferirTurno, paraMinutos, retornoEmAbertoDe, type Avaliacao, type Jornada, type Parametros } from "./aoVivo";
 
 export type RegistroCompleto = { data: string; hora: string; tipo: number };
 export type InfoDiaSecullum = { folga: boolean; justificativa: string | null };
-export type DiaEscala = { situacao: string; jornada: Jornada | null };
+export type TurnoNome = "dia" | "noite";
+export type DiaEscala = { situacao: string; jornada: Jornada | null; alternativa?: { turno: TurnoNome; jornada: Jornada } | null }; // alternativa: o outro turno da unidade (para troca no dia)
 export type DiaHorario = { jornada: Jornada | null; folga: boolean; texto: string | null };
 export type LinhaOficial = Record<string, string>;
 
@@ -37,6 +38,8 @@ export type DiaMes = {
   trabalhadoMin: number;
   intervaloMin: number | null;
   semSaida: boolean;
+  retornoEmAberto: boolean; // retorno do intervalo sem registro: a última batida foi tratada como saída
+  turnoDeduzido: TurnoNome | null; // trocou de turno só neste dia; deduzido pelas batidas
   semIntervalo: boolean;
   saidaAntecipadaMin: number | null;
   folgaTrabalhada: boolean;
@@ -55,6 +58,8 @@ export type ResumoMes = {
   atrasoTotalMin: number;
   saidasAntecipadas: number;
   semSaida: number;
+  retornosEmAberto: number;
+  turnosDeduzidos: number;
   semIntervalo: number;
   intervalosCurtos: number;
   trabalhadoMin: number;
@@ -110,6 +115,12 @@ function contarDesconsideradas(registros: RegistroCompleto[], dia: string): numb
   return n;
 }
 
+/** "01:16" -> 76. Valor que não é horário mas está preenchido conta como 1 (há desconto, tamanho desconhecido). */
+function minutosOficiais(v: string | undefined): number {
+  const m = /^(\d{1,3}):(\d{2})/.exec((v ?? "").trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : temValor(v) ? 1 : 0;
+}
+
 export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } {
   const p = e.parametros ?? PARAMETROS_PADRAO;
   const dias: DiaMes[] = [];
@@ -129,7 +140,10 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
     const ausenciaEscala = esc && ["ferias", "afastamento", "indisponibilidade"].includes(esc.situacao) ? ROTULO_ESCALA[esc.situacao] : null;
 
     // Qual horário vale: o da escala; sem escala no mês, o do Secullum (só para medir atraso de quem bateu, nunca para declarar falta).
-    const jornadaEscala = trabalhaNaEscala ? esc!.jornada : null;
+    // Troca de turno só neste dia (ex.: da manhã que cobriu a noite): deduzida pela primeira batida; então não conta atraso.
+    const trocou = esc?.situacao === "trabalha" && inferirTurno(b, esc.jornada, esc.alternativa?.jornada ?? null, p);
+    const turnoDeduzido: TurnoNome | null = trocou ? (esc!.alternativa?.turno ?? null) : null;
+    const jornadaEscala = trabalhaNaEscala ? (trocou ? esc!.alternativa!.jornada : esc!.jornada) : null;
     const jornada = n > 0 ? (jornadaEscala ?? (temEscala ? null : hor.jornada)) : jornadaEscala;
     const fonte: DiaMes["fontePrevisto"] = jornadaEscala ? "escala" : n > 0 && !temEscala && hor.jornada ? "secullum" : null;
     const jornadaMostrada = jornada ?? (!temEscala ? hor.jornada : null);
@@ -142,23 +156,28 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
     const avaliacao = futuro ? null : classificar({ jornada, batidas: b, agoraMin: agoraDia, folga, justificativa, confiavel: true }, p);
 
     const passado = dia < e.hoje;
-    const semSaida = !futuro && n % 2 === 1 && (passado || !!avaliacao?.semSaida);
+    const retornoEmAberto = !futuro && retornoEmAbertoDe(b, p);
+    const semSaida = !futuro && n % 2 === 1 && !retornoEmAberto && (passado || !!avaliacao?.semSaida);
     const semIntervalo = !futuro && n === 2 && b[1].minuto - b[0].minuto >= 360;
     const ultima = n > 0 ? b[n - 1] : null;
     const saidaAntecipadaMin = avaliacao && jornada && n >= 2 && n % 2 === 0 && avaliacao.situacao === "encerrou" && !avaliacao.semRetorno && ultima && ultima.minuto < jornada.fim - p.tolerancia ? jornada.fim - ultima.minuto : null;
     const folgaTrabalhada = temEscala && diaDeFolga && n > 0;
     const oficial = oficialDoDia;
 
+    // Divergências com o cálculo oficial. Atenção: na coluna "Faltas" do Secullum vão HORAS descontadas (atraso, saída antes,
+    // batida faltando...), não só falta de dia inteiro; e atraso pode vir dentro de "Faltas". Por isso comparamos o total descontado.
     const divergencias: string[] = [];
     if (oficial && avaliacao) {
-      const faltaOficial = temValor(oficial["Faltas"]);
-      const atrasoOficial = temValor(oficial["Atras."]);
-      if (temEscala && !justificativa) {
-        const nossaFalta = avaliacao.situacao === "falta" || avaliacao.situacao === "ausente";
-        if (nossaFalta && !faltaOficial) divergencias.push("BlackPoke vê falta; o Secullum não lançou falta");
-        if (!nossaFalta && faltaOficial && n > 0) divergencias.push("O Secullum lançou falta, mas há batidas");
+      if (temEscala && !justificativa && (avaliacao.situacao === "falta" || avaliacao.situacao === "ausente") && !temValor(oficial["Faltas"])) divergencias.push("BlackPoke vê falta; o Secullum não lançou falta");
+      if (n > 0) {
+        const descontoMin = minutosOficiais(oficial["Faltas"]) + minutosOficiais(oficial["Atras."]);
+        const nossoAtraso = avaliacao.atrasoMin ?? 0;
+        if (descontoMin > 0 && nossoAtraso === 0 && saidaAntecipadaMin === null) {
+          divergencias.push(`O Secullum descontou ${duracao(descontoMin)} (faltas/atrasos) e o BlackPoke não vê atraso nem saída antecipada${semSaida || retornoEmAberto ? " (há batida faltando neste dia)" : ""}`);
+        } else if (nossoAtraso > 0 && descontoMin === 0) {
+          divergencias.push(`Atraso de ${nossoAtraso} min no BlackPoke; o Secullum não descontou nada (tolerância ou compensação lá)`);
+        }
       }
-      if (n > 0 && (avaliacao.atrasoMin !== null) !== atrasoOficial) divergencias.push(avaliacao.atrasoMin !== null ? "Atraso no BlackPoke que o Secullum não lançou (tolerâncias diferentes?)" : "Atraso lançado pelo Secullum que o BlackPoke não vê");
     }
 
     const rotulo = futuro ? (trabalhaNaEscala ? "Previsto" : "—") : avaliacao ? (avaliacao.situacao === "justificado" && avaliacao.motivo ? `Justificado: ${avaliacao.motivo}` : n === 0 && !temEscala && !folga && !justificativa ? "Sem batida" : avaliacao.situacao === "folga" && !temEscala ? "Folga (Secullum)" : ROTULO_SITUACAO[avaliacao.situacao]) : "—";
@@ -174,8 +193,10 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
       avaliacao,
       rotulo,
       trabalhadoMin: minutosTrabalhados(b),
-      intervaloMin: n >= 3 ? b[2].minuto - b[1].minuto : null,
+      intervaloMin: n >= 3 && !retornoEmAberto ? b[2].minuto - b[1].minuto : null,
       semSaida,
+      retornoEmAberto,
+      turnoDeduzido,
       semIntervalo,
       saidaAntecipadaMin,
       folgaTrabalhada,
@@ -196,6 +217,8 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
     atrasoTotalMin: passados.reduce((s, d) => s + (d.avaliacao!.atrasoMin ?? 0), 0),
     saidasAntecipadas: passados.filter((d) => d.saidaAntecipadaMin !== null).length,
     semSaida: passados.filter((d) => d.semSaida).length,
+    retornosEmAberto: passados.filter((d) => d.retornoEmAberto).length,
+    turnosDeduzidos: passados.filter((d) => d.turnoDeduzido !== null).length,
     semIntervalo: passados.filter((d) => d.semIntervalo).length,
     intervalosCurtos: passados.filter((d) => d.avaliacao!.intervaloCurtoMin !== null).length,
     trabalhadoMin: passados.reduce((s, d) => s + d.trabalhadoMin, 0),
@@ -223,6 +246,10 @@ export function pontosDeAtencao(dias: DiaMes[], resumo: ResumoMes, temEscala: bo
   if (atrasos.length) out.push(`Atrasos: ${atrasos.length}, somando ${resumo.atrasoTotalMin} min — ${atrasos.map((d) => `${dm(d.dia)} (${d.avaliacao!.atrasoMin} min)`).join(", ")}`);
   const semSaida = f((d) => d.semSaida);
   if (semSaida.length) out.push(`Batida faltando (número ímpar de batidas): ${semSaida.length} — ${lista(semSaida)}`);
+  const retornos = f((d) => d.retornoEmAberto);
+  if (retornos.length) out.push(`Retorno do intervalo sem registro (a última batida foi tratada como saída): ${retornos.length} — ${lista(retornos)}`);
+  const trocas = f((d) => d.turnoDeduzido !== null);
+  if (trocas.length) out.push(`Dias em que o horário do outro turno foi usado (deduzido pelas batidas): ${trocas.length} — ${trocas.map((d) => `${dm(d.dia)} (turno da ${d.turnoDeduzido === "noite" ? "noite" : "manhã"})`).join(", ")}`);
   const semInt = f((d) => d.semIntervalo);
   if (semInt.length) out.push(`Sem batida de intervalo em jornada longa: ${semInt.length} — ${lista(semInt)}`);
   const curtos = f((d) => d.avaliacao!.intervaloCurtoMin !== null);

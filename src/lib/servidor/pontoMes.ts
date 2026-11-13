@@ -121,7 +121,10 @@ export async function montarMesDoColaborador(db: SupabaseClient, funcionarioId: 
             const b = jor("noite");
             jornada = a && b ? { inicio: a.inicio, fim: b.fim } : (a ?? b);
           }
-          escala.set(String(d.data), { situacao: sit, jornada });
+          // O outro turno da unidade: base para deduzir uma troca só neste dia (ver inferirTurno).
+          const outro = String(c.turno) === "dia" ? "noite" : "dia";
+          const jAlt = sit === "trabalha" ? jor(outro) : null;
+          escala.set(String(d.data), { situacao: sit, jornada, alternativa: jAlt ? { turno: outro, jornada: jAlt } : null });
           statusEscala = String((d.escalas_mensais as unknown as { status: string }).status);
         }
       }

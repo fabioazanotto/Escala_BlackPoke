@@ -1,5 +1,6 @@
 // Exportação do mês em CSV (para conferência pelo contador). Separador ";" e BOM para abrir certo no Excel em português.
 
+import { posicionar } from "./aoVivo";
 import { duracao, type DiaMes } from "./mes";
 import type { MesDoColaborador } from "./mesTipos";
 
@@ -18,6 +19,8 @@ export function observacoesDoDia(d: DiaMes): string[] {
   if (!a) return o;
   if (a.atrasoMin !== null) o.push(`Chegou ${a.atrasoMin} min depois do previsto`);
   if (d.semSaida) o.push("Batida faltando (número ímpar de batidas)");
+  if (d.retornoEmAberto) o.push("Retorno do intervalo sem registro (a última batida foi tratada como saída)");
+  if (d.turnoDeduzido) o.push(`Horário do turno da ${d.turnoDeduzido === "noite" ? "noite" : "manhã"} usado (deduzido pelas batidas)`);
   if (d.semIntervalo) o.push("Sem batida de intervalo");
   if (a.intervaloCurtoMin !== null) o.push(`Intervalo de ${a.intervaloCurtoMin} min (menos de 1h)`);
   if (a.semRetorno) o.push("Saiu e não voltou");
@@ -35,7 +38,7 @@ export function montarCsv(m: MesDoColaborador, incluirOficial: boolean): string 
   const linhas = m.dias.map((d) =>
     [
       dataBR(d.dia), d.diaSemana, d.escala ?? "", d.previsto ?? "",
-      d.batidas[0]?.hora ?? "", d.batidas[1]?.hora ?? "", d.batidas[2]?.hora ?? "", d.batidas[3]?.hora ?? "",
+      ...posicionar(d.batidas, d.retornoEmAberto).map((b) => b?.hora ?? ""),
       Math.max(0, d.batidas.length - 4) || "",
       d.trabalhadoMin > 0 ? duracao(d.trabalhadoMin) : "", d.rotulo, observacoesDoDia(d).join(" | "),
       ...oficiais.map((c) => d.oficial?.[c] ?? ""),

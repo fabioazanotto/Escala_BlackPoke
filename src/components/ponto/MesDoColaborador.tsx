@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { COLUNAS_OFICIAIS, dataBR, montarCsv, observacoesDoDia } from "@/lib/ponto/csv";
+import { posicionar } from "@/lib/ponto/aoVivo";
 import { duracao, type DiaMes } from "@/lib/ponto/mes";
 import type { FuncionarioDaLista, MesDoColaborador } from "@/lib/ponto/mesTipos";
 import { ListaColaboradoresPonto } from "@/components/ponto/ListaColaboradoresPonto";
@@ -30,6 +31,8 @@ function selosDoDia(d: DiaMes): Selo[] {
     default: out.push(a.atrasoMin !== null ? { texto: `Atrasado ${a.atrasoMin} min`, classe: "bg-amber-100 text-amber-900", marca: "▲" } : { texto: d.folgaTrabalhada ? "Trabalhou na folga" : "Presente", ...(d.folgaTrabalhada ? { classe: "bg-amber-100 text-amber-900", marca: "!" } : verde) });
   }
   if (d.semSaida) out.push({ texto: "Batida faltando", classe: "bg-amber-100 text-amber-900", marca: "!" });
+  if (d.retornoEmAberto) out.push({ texto: "Retorno do intervalo sem registro", classe: "bg-amber-100 text-amber-900", marca: "!" });
+  if (d.turnoDeduzido) out.push({ texto: `Turno da ${d.turnoDeduzido === "noite" ? "noite" : "manhã"} (deduzido)`, classe: "bg-sky-100 text-sky-900", marca: "⇄" });
   return out;
 }
 
@@ -199,6 +202,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
             <Cartao rotulo="Faltas" valor={r.faltas === null ? "—" : String(r.faltas)} apoio={r.faltas === null ? "sem escala: veja o oficial" : "escalado e sem nenhuma batida"} alerta={!!r.faltas} />
             <Cartao rotulo="Atrasos" valor={String(r.atrasos)} apoio={r.atrasos ? `${r.atrasoTotalMin} min no total` : undefined} alerta={r.atrasos > 0} />
             <Cartao rotulo="Batida faltando" valor={String(r.semSaida)} apoio="número ímpar de batidas" alerta={r.semSaida > 0} />
+            <Cartao rotulo="Retorno do intervalo sem registro" valor={String(r.retornosEmAberto)} alerta={r.retornosEmAberto > 0} />
             <Cartao rotulo="Sem batida de intervalo" valor={String(r.semIntervalo)} alerta={r.semIntervalo > 0} />
             <Cartao rotulo="Intervalo < 1 hora" valor={String(r.intervalosCurtos)} alerta={r.intervalosCurtos > 0} />
             <Cartao rotulo="Saídas antecipadas" valor={String(r.saidasAntecipadas)} />
@@ -282,12 +286,12 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
                         </td>
                         <td className="py-2 pr-3 text-neutral-700">{d.escala ?? "—"}</td>
                         <td className="whitespace-nowrap py-2 pr-3 tabular-nums text-neutral-600">{d.previsto ?? "—"}</td>
-                        {[0, 1, 2, 3].map((i) => (
+                        {posicionar(d.batidas, d.retornoEmAberto).map((b, i) => (
                           <td key={i} className="py-2 pr-2 tabular-nums">
-                            {d.batidas[i] ? (
+                            {b ? (
                               <>
-                                {d.batidas[i].hora}
-                                {d.batidas[i].manual && <span className="ml-1 text-xs text-neutral-500">manual</span>}
+                                {b.hora}
+                                {b.manual && <span className="ml-1 text-xs text-neutral-500">manual</span>}
                               </>
                             ) : (
                               <span className="text-neutral-300">—</span>
@@ -345,7 +349,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
                       <p className="text-xs text-neutral-600">{[d.escala, d.previsto].filter(Boolean).join(" · ") || "—"}</p>
                     </div>
                     {!d.futuro && <div className="mt-1 flex flex-wrap gap-1">{selosDoDia(d).map((s) => <Chip key={s.texto} s={s} />)}</div>}
-                    {d.batidas.length > 0 && <p className="mt-1 text-xs tabular-nums text-neutral-700">{d.batidas.map((b) => b.hora + (b.manual ? " (manual)" : "")).join(" · ")} {d.trabalhadoMin > 0 && `· ${duracao(d.trabalhadoMin)}`}</p>}
+                    {d.batidas.length > 0 && <p className="mt-1 text-xs tabular-nums text-neutral-700">{(d.retornoEmAberto ? posicionar(d.batidas, true) : d.batidas).map((b) => (b ? b.hora + (b.manual ? " (manual)" : "") : "—")).join(" · ")} {d.trabalhadoMin > 0 && `· ${duracao(d.trabalhadoMin)}`}</p>}
                     {obs.map((t) => (
                       <p key={t} className={`mt-0.5 text-xs ${t.startsWith("Divergência") ? "text-amber-900" : "text-neutral-700"}`}>
                         {t}

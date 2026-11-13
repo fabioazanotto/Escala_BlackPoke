@@ -3,6 +3,7 @@ import { jornadaDe } from "./aoVivo";
 import { montarMes, parseCalcular, pontosDeAtencao, temValor, ultimoDiaDoMes, type DiaEscala, type EntradaMes } from "./mes";
 
 const noite = jornadaDe("16:00", "00:20")!;
+const manha = jornadaDe("09:00", "17:20")!;
 const reg = (data: string, hora: string, tipo = 0) => ({ data, hora, tipo });
 
 function base(extra: Partial<EntradaMes> = {}): EntradaMes {
@@ -106,7 +107,7 @@ describe("mês do colaborador", () => {
     const registros = [reg("2026-11-02", "16:12"), reg("2026-11-02", "17:30"), reg("2026-11-02", "18:30"), reg("2026-11-03", "00:20")];
     const r = montarMes(base({ escala: escalaTodos("trabalha"), registros, oficial }));
     expect(dia(r, "2026-11-03").divergencias.join()).toContain("BlackPoke vê falta");
-    expect(dia(r, "2026-11-02").divergencias.join()).toContain("Atraso no BlackPoke");
+    expect(dia(r, "2026-11-02").divergencias.join()).toContain("Atraso de 12 min no BlackPoke");
     expect(r.resumo.divergencias).toBe(2);
   });
 
@@ -137,5 +138,67 @@ describe("cálculo oficial e pontos de atenção", () => {
     const t = pontosDeAtencao(r.dias, r.resumo, true).join("\n");
     expect(t).toContain("Faltas");
     expect(t).toContain("02/11 (12 min)");
+  });
+});
+
+describe("retorno do intervalo sem registro", () => {
+  it("3 batidas com a terceira horas depois: vira saída e o retorno fica em aberto", () => {
+    // 08/11: entrada 09:58, 17:11 e 19:08 (1h57 depois) -> 19:08 é a saída; retorno sem registro.
+    const registros = [reg("2026-11-08", "09:58"), reg("2026-11-08", "17:11"), reg("2026-11-08", "19:08")];
+    const r = montarMes(base({ escala: escalaTodos("trabalha", manha), registros }));
+    const d = dia(r, "2026-11-08");
+    expect(d.retornoEmAberto).toBe(true);
+    expect(d.semSaida).toBe(false);
+    expect(d.avaliacao).toMatchObject({ situacao: "encerrou", retornoEmAberto: true });
+    expect(d.trabalhadoMin).toBe(433); // só o par entrada -> saída int. (7h13); sem inventar o período do retorno
+    expect(d.intervaloMin).toBeNull();
+    expect(r.resumo.retornosEmAberto).toBe(1);
+  });
+  it("até 70 min depois da saída para o intervalo ainda é retorno (e falta a saída)", () => {
+    const registros = [reg("2026-11-08", "09:00"), reg("2026-11-08", "12:00"), reg("2026-11-08", "13:10")];
+    const d = dia(montarMes(base({ escala: escalaTodos("trabalha", manha), registros })), "2026-11-08");
+    expect(d.retornoEmAberto).toBe(false);
+    expect(d.semSaida).toBe(true);
+    const mais = [reg("2026-11-08", "09:00"), reg("2026-11-08", "12:00"), reg("2026-11-08", "13:11")];
+    expect(dia(montarMes(base({ escala: escalaTodos("trabalha", manha), registros: mais })), "2026-11-08").retornoEmAberto).toBe(true);
+  });
+});
+
+describe("troca de turno só no dia", () => {
+  const escalaManhaComNoite = () => new Map<string, DiaEscala>(Array.from({ length: 30 }, (_, i) => [`2026-11-${String(i + 1).padStart(2, "0")}`, { situacao: "trabalha", jornada: manha, alternativa: { turno: "noite" as const, jornada: noite } }]));
+  it("quem é da manhã e bate no horário da noite não conta atraso: usa o turno da noite", () => {
+    const registros = [reg("2026-11-07", "15:43"), reg("2026-11-07", "17:00"), reg("2026-11-07", "17:55"), reg("2026-11-08", "00:07")];
+    const d = dia(montarMes(base({ escala: escalaManhaComNoite(), registros })), "2026-11-07");
+    expect(d.turnoDeduzido).toBe("noite");
+    expect(d.previsto).toBe("16:00–00:20");
+    expect(d.avaliacao?.atrasoMin).toBeNull();
+    expect(d.avaliacao?.situacao).toBe("encerrou");
+  });
+  it("atraso grande da manhã que NÃO cai na janela da noite continua sendo atraso", () => {
+    const registros = [reg("2026-11-07", "12:30"), reg("2026-11-07", "17:20")];
+    const d = dia(montarMes(base({ escala: escalaManhaComNoite(), registros })), "2026-11-07");
+    expect(d.turnoDeduzido).toBeNull();
+    expect(d.avaliacao?.atrasoMin).toBe(210);
+  });
+  it("chegar dentro da janela da própria manhã (mesmo atrasado) mantém o turno", () => {
+    const registros = [reg("2026-11-08", "09:58"), reg("2026-11-08", "17:20")];
+    const d = dia(montarMes(base({ escala: escalaManhaComNoite(), registros })), "2026-11-08");
+    expect(d.turnoDeduzido).toBeNull();
+    expect(d.avaliacao?.atrasoMin).toBe(58);
+  });
+});
+
+describe("divergências com o Secullum (colunas Faltas e Atras. são horas descontadas)", () => {
+  it("Secullum desconta horas e o BlackPoke não vê atraso: mostra as horas, sem chamar de falta", () => {
+    const registros = [reg("2026-11-02", "16:00"), reg("2026-11-02", "17:30"), reg("2026-11-02", "18:30"), reg("2026-11-03", "00:20")];
+    const oficial = new Map([["2026-11-02", { Faltas: "00:58", "Atras.": "" }]]);
+    const msg = dia(montarMes(base({ escala: escalaTodos("trabalha"), registros, oficial })), "2026-11-02").divergencias.join();
+    expect(msg).toContain("descontou 0h58");
+    expect(msg).not.toContain("lançou falta");
+  });
+  it("atraso no BlackPoke e desconto no Secullum não é divergência", () => {
+    const registros = [reg("2026-11-02", "16:55"), reg("2026-11-02", "17:30"), reg("2026-11-02", "18:30"), reg("2026-11-03", "00:20")];
+    const oficial = new Map([["2026-11-02", { Faltas: "00:55", "Atras.": "" }]]);
+    expect(dia(montarMes(base({ escala: escalaTodos("trabalha"), registros, oficial })), "2026-11-02").divergencias).toEqual([]);
   });
 });

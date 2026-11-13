@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ATUALIZAR_A_CADA_S, INTERVALO_ALERTA_MIN } from "@/config/ponto";
-import type { Avaliacao, Contagem } from "@/lib/ponto/aoVivo";
+import { posicionar, type Avaliacao, type Contagem } from "@/lib/ponto/aoVivo";
 import type { LojaAoVivo, PainelAoVivo, PessoaAoVivo } from "@/lib/ponto/aoVivoTipos";
 import { supabase } from "@/lib/supabase";
 
@@ -52,14 +52,16 @@ function seloAndamento(a: Avaliacao): Selo | null {
 }
 
 /** Detalhes em texto: o que o selo não diz. */
-function detalhes(a: Avaliacao, visao: Visao): string[] {
+function detalhes(a: Avaliacao, visao: Visao, turnoDeduzido?: "dia" | "noite" | null): string[] {
   const d: string[] = [];
+  if (turnoDeduzido) d.push(`Horário do turno da ${turnoDeduzido === "noite" ? "noite" : "manhã"} usado (deduzido pelas batidas)`);
   if (a.situacao === "intervalo" && a.minutosNoIntervalo !== null) d.push(`Em intervalo há ${duracao(a.minutosNoIntervalo)}${a.alertaIntervalo ? ` ⚠ passou de ${INTERVALO_ALERTA_MIN} min` : ""}`);
   if (visao === "escala" && a.atrasoMin !== null) d.push(`Chegou ${a.atrasoMin} min depois do previsto`);
   if (a.minutosSemRegistro !== null) d.push(a.situacao === "ausente" ? `Sem registro há ${a.minutosSemRegistro} min do horário previsto` : `Sem registro há ${a.minutosSemRegistro} min`);
   if (a.situacao === "falta") d.push("Turno terminou sem nenhuma batida");
   if (a.intervaloCurtoMin !== null) d.push(`Intervalo de ${a.intervaloCurtoMin} min (menos de ${INTERVALO_ALERTA_MIN} min)`);
   if (a.semRetorno) d.push("Saiu e não voltou");
+  if (a.retornoEmAberto) d.push("Retorno do intervalo sem registro (a última batida foi tratada como saída)");
   if (a.semSaida) d.push("Sem saída depois do horário previsto");
   return d;
 }
@@ -92,7 +94,7 @@ function Chip({ selo }: { selo: Selo }) {
 function Situacao({ p, visao }: { p: PessoaAoVivo; visao: Visao }) {
   const selo = visao === "escala" ? seloEscala(p.avaliacao, p.foraDaEscala) : seloPonto(p.avaliacao);
   const andamento = visao === "escala" && !p.foraDaEscala ? seloAndamento(p.avaliacao) : null;
-  const extra = detalhes(p.avaliacao, visao);
+  const extra = detalhes(p.avaliacao, visao, p.turnoDeduzido);
   return (
     <>
       <span className="inline-flex flex-wrap gap-1">
@@ -137,7 +139,7 @@ function Cartoes({ pessoas, visao, mes }: { pessoas: PessoaAoVivo[]; visao: Visa
           <p className="mt-1.5 text-xs tabular-nums text-neutral-700">
             {p.batidas.length === 0
               ? "Sem batidas"
-              : p.batidas.map((b, i) => `${NOMES_BATIDA[i]} ${b.hora}${b.manual ? " (manual)" : ""}`).join(" · ")}
+              : posicionar(p.batidas, p.avaliacao.retornoEmAberto).flatMap((b, i) => (b ? [`${NOMES_BATIDA[i]} ${b.hora}${b.manual ? " (manual)" : ""}`] : [])).join(" · ")}
             {p.batidasExtras > 0 && ` · +${p.batidasExtras}`}
           </p>
         </li>
@@ -173,12 +175,12 @@ function Tabela({ pessoas, visao, mes }: { pessoas: PessoaAoVivo[]; visao: Visao
                   <NomeComLink p={p} mes={mes} />
                 </td>
                 <td className="py-2 pr-3 tabular-nums text-neutral-600">{p.previsto ?? "—"}</td>
-                {[0, 1, 2, 3].map((i) => (
+                {posicionar(p.batidas, p.avaliacao.retornoEmAberto).map((b, i) => (
                   <td key={i} className="py-2 pr-2 tabular-nums">
-                    {p.batidas[i] ? (
+                    {b ? (
                       <>
-                        {p.batidas[i].hora}
-                        {p.batidas[i].manual && <span className="ml-1 text-xs text-neutral-500" title="Batida incluída manualmente">manual</span>}
+                        {b.hora}
+                        {b.manual && <span className="ml-1 text-xs text-neutral-500" title="Batida incluída manualmente">manual</span>}
                       </>
                     ) : (
                       <span className="text-neutral-300">—</span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, jornadaDe, paraMinutos, type Batida } from "./aoVivo";
+import { agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, inferirTurno, jornadaDe, paraMinutos, posicionar, retornoEmAbertoDe, type Batida } from "./aoVivo";
 
 const m = (h: string) => paraMinutos(h)!;
 const bat = (...horas: string[]): Batida[] => horas.map((h) => ({ minuto: m(h) < 300 ? m(h) + 1440 : m(h), hora: h, manual: false }));
@@ -128,5 +128,34 @@ describe("contagem por loja", () => {
       classificar({ jornada: dia, batidas: [], agoraMin: 600, folga: true }),
     ];
     expect(contar(a)).toMatchObject({ trabalhando: 2, intervalo: 1, atrasados: 2, ausentes: 1, aguardando: 0, folgaOuJustificado: 1, total: 6 });
+  });
+});
+
+describe("retorno do intervalo e posição das batidas", () => {
+  it("terceira batida horas depois da saída para o intervalo: encerrou, com retorno em aberto", () => {
+    const a = classificar({ jornada: dia, batidas: bat("09:58", "17:11", "19:08"), agoraMin: m("20:00") });
+    expect(a).toMatchObject({ situacao: "encerrou", retornoEmAberto: true });
+  });
+  it("até 70 minutos conta como retorno; posicionar deixa o retorno vazio só quando está em aberto", () => {
+    const b = bat("09:00", "12:00", "13:10");
+    expect(retornoEmAbertoDe(b)).toBe(false);
+    expect(posicionar(b, false).map((x) => x?.hora ?? null)).toEqual(["09:00", "12:00", "13:10", null]);
+    const c = bat("09:00", "12:00", "13:30");
+    expect(retornoEmAbertoDe(c)).toBe(true);
+    expect(posicionar(c, true).map((x) => x?.hora ?? null)).toEqual(["09:00", "12:00", null, "13:30"]);
+  });
+});
+
+describe("inferirTurno", () => {
+  const manha = dia;
+  it("primeira batida na janela do outro turno e fora da do próprio", () => {
+    expect(inferirTurno(bat("15:43"), manha, noite)).toBe(true);
+    expect(inferirTurno(bat("08:30"), noite, manha)).toBe(true);
+  });
+  it("não troca quando está na janela do próprio turno, fora das duas janelas, ou sem outro turno/batida", () => {
+    expect(inferirTurno(bat("09:58"), manha, noite)).toBe(false);
+    expect(inferirTurno(bat("12:30"), manha, noite)).toBe(false);
+    expect(inferirTurno(bat("15:43"), manha, null)).toBe(false);
+    expect(inferirTurno([], manha, noite)).toBe(false);
   });
 });

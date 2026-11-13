@@ -2,14 +2,14 @@
 // Todos os horários são em MINUTOS desde 00:00 do "dia de trabalho" e podem passar de 1440 (madrugada do dia seguinte).
 // É uma classificação OPERACIONAL e provisória: não gera desconto nem hora extra, e é calculada só pelas batidas RECEBIDAS.
 
-import { AUSENTE_APOS_MIN, DIA_DE_TRABALHO_VIRA_AS, INTERVALO_ALERTA_MIN, MARGEM_ENCERRAMENTO_MIN, TOLERANCIA_ATRASO_MIN } from "@/config/ponto";
+import { AUSENTE_APOS_MIN, DIA_DE_TRABALHO_VIRA_AS, INTERVALO_ALERTA_MIN, LIMITE_RETORNO_INTERVALO_MIN, MARGEM_ENCERRAMENTO_MIN, TOLERANCIA_ATRASO_MIN, TROCA_TURNO_ANTES_MIN, TROCA_TURNO_DEPOIS_MIN } from "@/config/ponto";
 import { somarDiasData } from "@/lib/vendas/datas";
 
 export type Jornada = { inicio: number; fim: number }; // fim sempre > inicio (já somado 1440 quando vira a meia-noite)
 export type Batida = { minuto: number; hora: string; manual: boolean };
 
-export type Parametros = { tolerancia: number; ausenteApos: number; alertaIntervalo: number; margemEncerramento: number };
-export const PARAMETROS_PADRAO: Parametros = { tolerancia: TOLERANCIA_ATRASO_MIN, ausenteApos: AUSENTE_APOS_MIN, alertaIntervalo: INTERVALO_ALERTA_MIN, margemEncerramento: MARGEM_ENCERRAMENTO_MIN };
+export type Parametros = { tolerancia: number; ausenteApos: number; alertaIntervalo: number; margemEncerramento: number; limiteRetorno: number; trocaAntes: number; trocaDepois: number };
+export const PARAMETROS_PADRAO: Parametros = { tolerancia: TOLERANCIA_ATRASO_MIN, ausenteApos: AUSENTE_APOS_MIN, alertaIntervalo: INTERVALO_ALERTA_MIN, margemEncerramento: MARGEM_ENCERRAMENTO_MIN, limiteRetorno: LIMITE_RETORNO_INTERVALO_MIN, trocaAntes: TROCA_TURNO_ANTES_MIN, trocaDepois: TROCA_TURNO_DEPOIS_MIN };
 
 export type Situacao =
   | "aguardando" // ainda não chegou a hora (ou está dentro da tolerância, sem batida)
@@ -33,6 +33,7 @@ export type Avaliacao = {
   intervaloCurtoMin: number | null; // primeiro intervalo já concluído com menos do limite
   semRetorno: boolean; // saiu e o turno acabou sem voltar
   semSaida: boolean; // entrou e passou muito do fim previsto sem saída
+  retornoEmAberto: boolean; // saiu para o intervalo, não bateu o retorno e a próxima batida (horas depois) foi tratada como a saída
   motivo: string | null;
 };
 
@@ -102,7 +103,7 @@ export type Entrada = {
 };
 
 export function classificar(e: Entrada, p: Parametros = PARAMETROS_PADRAO): Avaliacao {
-  const base: Avaliacao = { situacao: "sem_batida", atrasoMin: null, minutosSemRegistro: null, minutosNoIntervalo: null, alertaIntervalo: false, intervaloCurtoMin: null, semRetorno: false, semSaida: false, motivo: null };
+  const base: Avaliacao = { situacao: "sem_batida", atrasoMin: null, minutosSemRegistro: null, minutosNoIntervalo: null, alertaIntervalo: false, intervaloCurtoMin: null, semRetorno: false, semSaida: false, retornoEmAberto: false, motivo: null };
   const b = e.batidas;
   const n = b.length;
   const j = e.jornada;
@@ -125,6 +126,9 @@ export function classificar(e: Entrada, p: Parametros = PARAMETROS_PADRAO): Aval
   const intervaloCurtoMin = n >= 3 && b[2].minuto - b[1].minuto < p.alertaIntervalo ? b[2].minuto - b[1].minuto : null;
   const comum = { ...base, atrasoMin, intervaloCurtoMin, motivo: e.justificativa ?? null };
 
+  // 3 batidas e a terceira veio muito depois da saída para o intervalo: é a SAÍDA, e o retorno ficou sem registro.
+  if (retornoEmAbertoDe(b, p)) return { ...comum, situacao: "encerrou", retornoEmAberto: true };
+
   if (n % 2 === 1) {
     const semSaida = !!j && e.agoraMin > j.fim + p.margemEncerramento;
     return { ...comum, situacao: "trabalhando", semSaida };
@@ -135,6 +139,31 @@ export function classificar(e: Entrada, p: Parametros = PARAMETROS_PADRAO): Aval
   if (encerrou) return { ...comum, situacao: "encerrou", semRetorno: !!j && n === 2 && ultima.minuto < j.fim - p.margemEncerramento };
   const minutos = Math.max(0, e.agoraMin - ultima.minuto);
   return { ...comum, situacao: "intervalo", minutosNoIntervalo: minutos, alertaIntervalo: minutos > p.alertaIntervalo };
+}
+
+// ---------------------------------------------------------------- posição das batidas
+
+/** Com 3 batidas, a 3ª veio depois do limite do intervalo: é a saída; o retorno do intervalo ficou sem registro. */
+export function retornoEmAbertoDe(b: Batida[], p: Parametros = PARAMETROS_PADRAO): boolean {
+  return b.length === 3 && b[2].minuto - b[1].minuto > p.limiteRetorno;
+}
+
+/** Coloca as batidas nas 4 colunas (Entrada, Saída int., Retorno, Saída). Retorno em aberto deixa a coluna do retorno vazia. */
+export function posicionar<T>(batidas: T[], retornoEmAberto: boolean): (T | null)[] {
+  if (retornoEmAberto && batidas.length === 3) return [batidas[0], batidas[1], null, batidas[2]];
+  return [0, 1, 2, 3].map((i) => batidas[i] ?? null);
+}
+
+/**
+ * Troca de turno só por uma necessidade do dia: a pessoa é de um turno, mas bateu no horário do outro.
+ * Vale o outro turno se a primeira batida está fora da janela do próprio turno e dentro da janela do outro.
+ * (Antes da primeira batida não há como saber; por isso a tela sempre avisa que o turno foi deduzido.)
+ */
+export function inferirTurno(batidas: Batida[], propria: Jornada | null, alternativa: Jornada | null, p: Parametros = PARAMETROS_PADRAO): boolean {
+  if (!propria || !alternativa || batidas.length === 0) return false;
+  const primeira = batidas[0].minuto;
+  const dentro = (j: Jornada) => primeira >= j.inicio - p.trocaAntes && primeira <= j.inicio + p.trocaDepois;
+  return !dentro(propria) && dentro(alternativa);
 }
 
 // ---------------------------------------------------------------- rótulos

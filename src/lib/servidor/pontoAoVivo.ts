@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LOJAS_XMENU } from "@/config/lojas";
 import { valorDoCampo } from "@/lib/integracoes/secullum";
-import { ROTULO_SITUACAO, ORDEM_SITUACAO, agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, jornadaDe, type Avaliacao, type Jornada } from "@/lib/ponto/aoVivo";
+import { ROTULO_SITUACAO, ORDEM_SITUACAO, agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, inferirTurno, jornadaDe, type Avaliacao, type Jornada } from "@/lib/ponto/aoVivo";
 import type { LojaAoVivo, PainelAoVivo, PessoaAoVivo } from "@/lib/ponto/aoVivoTipos";
 import { somarDiasData } from "@/lib/vendas/datas";
 import { comCache, reiniciarCache } from "./cacheCurto";
@@ -165,19 +165,29 @@ export async function montarAoVivo(db: SupabaseClient, agora = agoraNoBrasil()):
     const f = fid !== undefined ? ativoPorId.get(fid) : undefined;
 
     if (!f) {
-      const av: Avaliacao = { situacao: "sem_batida", atrasoMin: null, minutosSemRegistro: null, minutosNoIntervalo: null, alertaIntervalo: false, intervaloCurtoMin: null, semRetorno: false, semSaida: false, motivo: null };
+      const av: Avaliacao = { situacao: "sem_batida", atrasoMin: null, minutosSemRegistro: null, minutosNoIntervalo: null, alertaIntervalo: false, intervaloCurtoMin: null, semRetorno: false, semSaida: false, retornoEmAberto: false, motivo: null };
       semVinculo.push({ chave: `c${id}`, funcionarioId: null, nome: String(c.nome), loja: null, previsto: jornada ? `${deMinutos(jornada.inicio)}–${deMinutos(jornada.fim)}` : null, fontePrevisto: "escala", batidas: [], batidasExtras: 0, avaliacao: av, rotulo: "Sem vínculo com o Secullum", escalaSituacao: sit, foraDaEscala: false, semVinculo: true, unidade });
       continue;
     }
     if (trabalha) escalados.add(f.id);
     const b = batidasDe(f.id);
+    // Troca de turno só neste dia, deduzida pela primeira batida (antes dela não há como saber).
+    let turnoDeduzido: "dia" | "noite" | null = null;
+    if (sit === "trabalha" && jornada) {
+      const outro = turno === "dia" ? "noite" : "dia";
+      const alt = jornadaDaUnidade(unidadeId, outro);
+      if (alt && inferirTurno(b, jornada, alt)) {
+        jornada = alt;
+        turnoDeduzido = outro;
+      }
+    }
     const motivoEscala = ROTULO_ESCALA[sit] ?? null;
     const just = justificativa.get(f.id) ?? motivoEscala ?? (folgaSecullum.has(f.id) && trabalha ? "Folga marcada no Secullum" : null);
     const av = classificar({ jornada: trabalha ? jornada : null, batidas: b, agoraMin, folga: !trabalha && !motivoEscala, justificativa: just, confiavel: true });
     const loja = lojaDaEmpresa.get(f.empresaId) ?? null;
     const pessoa: PessoaAoVivo = {
       chave: `c${id}`, funcionarioId: f.id, nome: String(c.nome), loja, previsto: trabalha && jornada ? `${deMinutos(jornada.inicio)}–${deMinutos(jornada.fim)}` : null, fontePrevisto: trabalha ? "escala" : null, ...mostrar(b), avaliacao: av, rotulo: rotuloDe(av),
-      escalaSituacao: sit, foraDaEscala: !trabalha && b.length > 0, semVinculo: false, unidade,
+      escalaSituacao: sit, foraDaEscala: !trabalha && b.length > 0, semVinculo: false, unidade, turnoDeduzido,
     };
     escalaPorLoja.set(loja, [...(escalaPorLoja.get(loja) ?? []), pessoa]);
   }

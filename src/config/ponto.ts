@@ -13,6 +13,19 @@ export const AUSENTE_APOS_MIN = 20;
 /** Intervalo aberto há mais que isso recebe um alerta. */
 export const INTERVALO_ALERTA_MIN = 60;
 
+/**
+ * Depois da saída para o intervalo, uma batida até tantos minutos depois conta como RETORNO.
+ * Passou disso, a batida é tratada como SAÍDA e o retorno do intervalo fica "sem registro".
+ */
+export const LIMITE_RETORNO_INTERVALO_MIN = 70;
+
+/**
+ * Troca de turno no dia (ex.: era da manhã e cobriu a noite): se a primeira batida cai nesta janela em volta do INÍCIO do outro turno
+ * (e fora da janela do próprio turno), o dia é medido pelo horário do outro turno, sem contar atraso.
+ */
+export const TROCA_TURNO_ANTES_MIN = 120;
+export const TROCA_TURNO_DEPOIS_MIN = 60;
+
 /** Saída do intervalo muito perto do fim do turno conta como encerramento. */
 export const MARGEM_ENCERRAMENTO_MIN = 30;
 

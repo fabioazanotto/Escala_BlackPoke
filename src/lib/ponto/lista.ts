@@ -2,6 +2,7 @@
 // Usa a mesma classificação da tela "Ponto ao vivo" (Avaliacao): as duas telas nunca divergem.
 // Classificação operacional: não gera desconto nem falta oficial.
 
+import { posicionar } from "./aoVivo";
 import type { PainelAoVivo, PessoaAoVivo } from "./aoVivoTipos";
 
 export type StatusLista = "trabalhando" | "intervalo" | "atrasado" | "ausente" | "justificado" | "fora" | "sem_info" | "desligado";
@@ -33,8 +34,9 @@ export function indicePorFuncionario(painel: PainelAoVivo | null): Map<number, P
 function ultimaBatidaDe(p: PessoaAoVivo): string | null {
   if (p.batidas.length === 0) return null;
   if (p.batidasExtras > 0) return `${p.batidas[p.batidas.length - 1].hora} (+${p.batidasExtras})`;
-  const i = p.batidas.length - 1;
-  return `${NOMES_BATIDA[i]} ${p.batidas[i].hora}`;
+  const slots = posicionar(p.batidas, p.avaliacao.retornoEmAberto);
+  const i = slots.reduce((u, b, k) => (b ? k : u), 0);
+  return `${NOMES_BATIDA[i]} ${slots[i]!.hora}`;
 }
 
 /** Situação de uma pessoa. A escala de hoje manda quando existe; senão vale a leitura só pelas batidas. */
@@ -47,13 +49,14 @@ export function situacaoDaLista(pessoas: PessoasDoFuncionario | undefined, ativo
   const a = p.avaliacao;
   const base = { previsto: p.previsto, ultimaBatida: ultimaBatidaDe(p), alerta: false };
   const foraEscala = p.foraDaEscala ? "Fora da escala hoje" : null;
+  const turno = p.turnoDeduzido ? `Turno da ${p.turnoDeduzido === "noite" ? "noite" : "manhã"} (deduzido pelas batidas)` : null;
   const juntar = (...t: (string | null)[]) => t.filter(Boolean).join(" · ") || null;
 
   switch (a.situacao) {
     case "trabalhando":
-      return { ...base, status: "trabalhando", rotulo: "Trabalhando", detalhe: juntar(foraEscala, a.atrasoMin !== null ? `Chegou ${a.atrasoMin} min depois do previsto` : null) };
+      return { ...base, status: "trabalhando", rotulo: "Trabalhando", detalhe: juntar(foraEscala, turno, a.atrasoMin !== null ? `Chegou ${a.atrasoMin} min depois do previsto` : null) };
     case "intervalo":
-      return { ...base, status: "intervalo", rotulo: "Em intervalo", alerta: a.alertaIntervalo, detalhe: juntar(foraEscala, a.minutosNoIntervalo !== null ? `Há ${duracao(a.minutosNoIntervalo)}${a.alertaIntervalo ? " ⚠ passou do limite" : ""}` : null) };
+      return { ...base, status: "intervalo", rotulo: "Em intervalo", alerta: a.alertaIntervalo, detalhe: juntar(foraEscala, turno, a.minutosNoIntervalo !== null ? `Há ${duracao(a.minutosNoIntervalo)}${a.alertaIntervalo ? " ⚠ passou do limite" : ""}` : null) };
     case "atrasado_sem_registro":
       return { ...base, status: "atrasado", rotulo: "Atrasado", detalhe: a.minutosSemRegistro !== null ? `Sem registro há ${a.minutosSemRegistro} min` : "Sem registro" };
     case "ausente":
@@ -63,7 +66,7 @@ export function situacaoDaLista(pessoas: PessoasDoFuncionario | undefined, ativo
     case "justificado":
       return { ...base, status: "justificado", rotulo: a.motivo ? `Justificado: ${a.motivo}` : "Justificado", detalhe: null };
     case "encerrou":
-      return { ...base, status: "fora", rotulo: "Fora do horário", detalhe: juntar(foraEscala, "Turno encerrado") };
+      return { ...base, status: "fora", rotulo: "Fora do horário", detalhe: juntar(foraEscala, turno, "Turno encerrado", a.retornoEmAberto ? "Retorno do intervalo sem registro" : null) };
     case "folga":
       return { ...base, status: "fora", rotulo: "Fora do horário", detalhe: juntar(foraEscala, "Folga") };
     case "aguardando":
