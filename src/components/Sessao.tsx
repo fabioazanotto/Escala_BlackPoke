@@ -5,9 +5,10 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase, variaveisConfiguradas } from "@/lib/supabase";
 import { identidade } from "@/config/identidade";
 import { TrocarSenha } from "@/components/TrocarSenha";
+import { ehCreator } from "@/lib/acesso";
 import type { Perfil } from "@/lib/tipos";
 
-type Contexto = { perfil: Perfil; sair: () => Promise<void> };
+type Contexto = { perfil: Perfil; creator: boolean; sair: () => Promise<void> };
 
 const SessaoContexto = createContext<Contexto | null>(null);
 
@@ -176,5 +177,5 @@ export function Sessao({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <SessaoContexto.Provider value={{ perfil, sair }}>{children}</SessaoContexto.Provider>;
+  return <SessaoContexto.Provider value={{ perfil, creator: perfil.perfil === "admin" && ehCreator(sessao.user), sair }}>{children}</SessaoContexto.Provider>;
 }

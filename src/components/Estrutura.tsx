@@ -37,7 +37,7 @@ function Marca() {
 
 function BarraLateral({ aoNavegar }: { aoNavegar?: () => void }) {
   const caminho = usePathname();
-  const { perfil, sair } = useSessao();
+  const { perfil, creator, sair } = useSessao();
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="flex h-16 items-center border-b border-neutral-200">
@@ -93,7 +93,7 @@ function BarraLateral({ aoNavegar }: { aoNavegar?: () => void }) {
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{perfil.nome}</p>
-            <p className="text-xs text-neutral-600">{ROTULO_PERFIL[perfil.perfil]}</p>
+            <p className="text-xs text-neutral-600">{ROTULO_PERFIL[perfil.perfil]}{creator && " · Creator"}</p>
           </div>
         </div>
         <Link href="/minha-conta" onClick={aoNavegar} className="mb-2 block rounded-lg px-3 py-2 text-center text-sm text-neutral-700 hover:bg-neutral-50">

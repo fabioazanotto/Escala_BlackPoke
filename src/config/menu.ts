@@ -29,7 +29,7 @@ export const destinos: Destino[] = [
     rotulo: "RH",
     href: "/rh",
     icone: "rh",
-    rotas: ["/rh", "/escala-mensal", "/colaboradores", "/ausencias", "/cobertura", "/ponto", "/ponto-integracao"],
+    rotas: ["/rh", "/escala-mensal", "/colaboradores", "/ausencias", "/cobertura", "/ponto", "/integracao-colaboradores"],
     perfis: ["rh", "gerencia", "admin"],
     subitens: [
       { rotulo: "Visão geral", href: "/rh" },
@@ -39,14 +39,14 @@ export const destinos: Destino[] = [
       { rotulo: "Cobertura", href: "/cobertura" },
       { rotulo: "Ponto ao vivo", href: "/ponto", exato: true },
       { rotulo: "Ponto por colaborador", href: "/ponto/colaborador" },
-      { rotulo: "Integração do ponto", href: "/ponto-integracao" },
+      { rotulo: "Integração colaboradores", href: "/integracao-colaboradores" },
     ],
   },
   {
     rotulo: "Configurações",
     href: "/unidades",
     icone: "configuracoes",
-    rotas: ["/unidades", "/funcoes", "/horarios", "/regras", "/regras-da-unidade", "/usuarios"],
+    rotas: ["/unidades", "/funcoes", "/horarios", "/regras", "/regras-da-unidade", "/usuarios", "/ponto-integracao"],
     perfis: ["rh", "gerencia", "admin"],
   },
 ];
@@ -59,6 +59,7 @@ export const abasConfiguracoes: { rotulo: string; href: string; somenteAdmin?: b
   { rotulo: "Regras e feriados", href: "/regras" },
   { rotulo: "Regras da unidade", href: "/regras-da-unidade" },
   { rotulo: "Usuários", href: "/usuarios", somenteAdmin: true },
+  { rotulo: "Integração do ponto", href: "/ponto-integracao", somenteAdmin: true },
 ];
 
 // Caminho mostrado na barra superior.
@@ -72,7 +73,8 @@ export const trilhas: Record<string, string[]> = {
   "/cobertura": ["RH", "Cobertura"],
   "/ponto": ["RH", "Ponto ao vivo"],
   "/ponto/colaborador": ["RH", "Ponto por colaborador"],
-  "/ponto-integracao": ["RH", "Integração do ponto"],
+  "/integracao-colaboradores": ["RH", "Integração colaboradores"],
+  "/ponto-integracao": ["Configurações", "Integração do ponto"],
   "/unidades": ["Configurações", "Unidades"],
   "/funcoes": ["Configurações", "Funções"],
   "/horarios": ["Configurações", "Horários"],

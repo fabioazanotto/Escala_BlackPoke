@@ -75,6 +75,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [oficial, setOficial] = useState(true);
+  const [mostrarLista, setMostrarLista] = useState(inicialFuncionario === null);
 
   useEffect(() => {
     let ativo = true;
@@ -110,11 +111,29 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
   }, [funcionarioId, mes, carregar]);
 
   const lojas = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const f of lista ?? []) if (f.lojaChave) m.set(f.lojaChave, f.loja);
+    const m = new Map<string, { nome: string; ativos: number }>();
+    for (const f of lista ?? []) {
+      if (!f.lojaChave) continue;
+      const atual = m.get(f.lojaChave) ?? { nome: f.loja, ativos: 0 };
+      if (f.ativo) atual.ativos += 1;
+      m.set(f.lojaChave, atual);
+    }
     return [...m.entries()];
   }, [lista]);
-  const opcoes = (lista ?? []).filter((f) => (lojaSel === null || f.lojaChave === lojaSel) && (desligados || f.ativo || f.id === funcionarioId));
+  const selecionado = (lista ?? []).find((f) => f.id === funcionarioId) ?? null;
+  const lojaEfetiva = lojaSel ?? selecionado?.lojaChave ?? null;
+  const doLoja = (lista ?? [])
+    .filter((f) => f.lojaChave === lojaEfetiva && (desligados || f.ativo))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+  function escolherLoja(chave: string) {
+    setLojaSel(chave);
+    setMostrarLista(true);
+  }
+  function escolherColaborador(id: number) {
+    setFuncionarioId(id);
+    setMostrarLista(false);
+  }
 
   function baixarCsv() {
     if (!dados) return;
@@ -134,43 +153,66 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
     <div className="space-y-4">
       <div className="nao-imprimir space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-sm text-neutral-600">Loja</span>
-          {[{ chave: null as string | null, nome: "Todas" }, ...lojas.map(([chave, nome]) => ({ chave: chave as string | null, nome: nome.replace("BlackPoke ", "") }))].map((l) => (
-            <button key={l.chave ?? "todas"} type="button" aria-pressed={lojaSel === l.chave} onClick={() => setLojaSel(l.chave)} className={`inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium ${lojaSel === l.chave ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"}`}>
-              {l.nome}
+          <span className="mr-1 text-sm text-neutral-600">Unidade</span>
+          {lojas.map(([chave, l]) => (
+            <button key={chave} type="button" aria-pressed={lojaEfetiva === chave} onClick={() => escolherLoja(chave)} className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium ${lojaEfetiva === chave ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"}`}>
+              {l.nome.replace("BlackPoke ", "")}
+              <span className={`text-xs ${lojaEfetiva === chave ? "text-neutral-300" : "text-neutral-500"}`}>{l.ativos}</span>
             </button>
           ))}
+          {!lista && !erro && <span className="text-sm text-neutral-600">Carregando…</span>}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select className="filtro max-w-full min-w-[16rem]" aria-label="Colaborador" value={funcionarioId ?? ""} onChange={(e) => setFuncionarioId(e.target.value ? Number(e.target.value) : null)}>
-            <option value="">{lista ? "Escolha o colaborador…" : "Carregando…"}</option>
-            {opcoes.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.nome} — {f.loja.replace("BlackPoke ", "")}
-                {f.ativo ? "" : " (desligado)"}
-              </option>
-            ))}
-          </select>
-          <label className="flex items-center gap-2 text-sm text-neutral-700">
-            <input type="checkbox" checked={desligados} onChange={(e) => setDesligados(e.target.checked)} /> incluir desligados
-          </label>
-          <div className="ml-auto flex items-center gap-1">
-            <button className="botao-secundario !px-3 !py-2" aria-label="Mês anterior" onClick={() => setMes(somarMeses(mes, -1))}>
-              ‹
+
+        {selecionado && !mostrarLista ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm text-neutral-700">
+              Colaborador: <strong>{selecionado.nome}</strong>
+            </p>
+            <button type="button" className="botao-secundario !px-3 !py-2" onClick={() => setMostrarLista(true)}>
+              Trocar colaborador
             </button>
-            <span className="min-w-[10rem] text-center text-sm font-semibold">{nomeMes(mes)}</span>
-            <button className="botao-secundario !px-3 !py-2" aria-label="Próximo mês" onClick={() => setMes(somarMeses(mes, 1))}>
-              ›
-            </button>
+            <div className="ml-auto flex items-center gap-1">
+              <button className="botao-secundario !px-3 !py-2" aria-label="Mês anterior" onClick={() => setMes(somarMeses(mes, -1))}>
+                ‹
+              </button>
+              <span className="min-w-[10rem] text-center text-sm font-semibold">{nomeMes(mes)}</span>
+              <button className="botao-secundario !px-3 !py-2" aria-label="Próximo mês" onClick={() => setMes(somarMeses(mes, 1))}>
+                ›
+              </button>
+            </div>
           </div>
-        </div>
+        ) : lojaEfetiva ? (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-neutral-600">{doLoja.length === 1 ? "1 colaborador" : `${doLoja.length} colaboradores`}{desligados ? "" : " ativos"}. Toque em um nome para abrir o ponto.</p>
+              <label className="ml-auto flex items-center gap-2 text-sm text-neutral-700">
+                <input type="checkbox" className="h-5 w-5" checked={desligados} onChange={(e) => setDesligados(e.target.checked)} /> incluir desligados
+              </label>
+            </div>
+            {doLoja.length === 0 ? (
+              <p className="text-neutral-600">Nenhum colaborador {desligados ? "" : "ativo "}nesta unidade.</p>
+            ) : (
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {doLoja.map((f) => (
+                  <li key={f.id}>
+                    <button type="button" aria-pressed={f.id === funcionarioId} onClick={() => escolherColaborador(f.id)} className={`flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium ${f.id === funcionarioId ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50"}`}>
+                      <span className="break-words">{f.nome}</span>
+                      {!f.ativo && <span className="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700">desligado</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : (
+          lista && <p className="text-neutral-600">Escolha uma unidade para ver os colaboradores.</p>
+        )}
       </div>
 
       {erro && <p className="nao-imprimir rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
-      {funcionarioId === null && !erro && <p className="text-neutral-600">Escolha uma loja e um colaborador para ver o mês.</p>}
-      {carregando && <p className="text-sm text-neutral-600">Carregando o mês no Secullum…</p>}
+      {carregando && !mostrarLista && <p className="text-sm text-neutral-600">Carregando o mês no Secullum…</p>}
 
-      {dados && r && !carregando && (
+      {dados && r && !carregando && !mostrarLista && (
         <div className="space-y-4">
           <section className="cartao space-y-1">
             <h2 className="text-xl font-semibold">{dados.funcionario.nome}</h2>
