@@ -2,14 +2,14 @@
 // Todos os horários são em MINUTOS desde 00:00 do "dia de trabalho" e podem passar de 1440 (madrugada do dia seguinte).
 // É uma classificação OPERACIONAL e provisória: não gera desconto nem hora extra, e é calculada só pelas batidas RECEBIDAS.
 
-import { AUSENTE_APOS_MIN, DIA_DE_TRABALHO_VIRA_AS, INTERVALO_ALERTA_MIN, LIMITE_RETORNO_INTERVALO_MIN, MARGEM_ENCERRAMENTO_MIN, TOLERANCIA_ATRASO_MIN, TROCA_TURNO_ANTES_MIN, TROCA_TURNO_DEPOIS_MIN } from "@/config/ponto";
+import { AUSENTE_APOS_MIN, DIA_DE_TRABALHO_VIRA_AS, DUPLICADA_ATE_MIN, INTERVALO_ALERTA_MIN, LIMITE_RETORNO_INTERVALO_MIN, MARGEM_ENCERRAMENTO_MIN, TOLERANCIA_ATRASO_MIN, TROCA_TURNO_ANTES_MIN, TROCA_TURNO_DEPOIS_MIN } from "@/config/ponto";
 import { somarDiasData } from "@/lib/vendas/datas";
 
 export type Jornada = { inicio: number; fim: number }; // fim sempre > inicio (já somado 1440 quando vira a meia-noite)
 export type Batida = { minuto: number; hora: string; manual: boolean };
 
-export type Parametros = { tolerancia: number; ausenteApos: number; alertaIntervalo: number; margemEncerramento: number; limiteRetorno: number; trocaAntes: number; trocaDepois: number };
-export const PARAMETROS_PADRAO: Parametros = { tolerancia: TOLERANCIA_ATRASO_MIN, ausenteApos: AUSENTE_APOS_MIN, alertaIntervalo: INTERVALO_ALERTA_MIN, margemEncerramento: MARGEM_ENCERRAMENTO_MIN, limiteRetorno: LIMITE_RETORNO_INTERVALO_MIN, trocaAntes: TROCA_TURNO_ANTES_MIN, trocaDepois: TROCA_TURNO_DEPOIS_MIN };
+export type Parametros = { tolerancia: number; ausenteApos: number; alertaIntervalo: number; margemEncerramento: number; limiteRetorno: number; trocaAntes: number; trocaDepois: number; duplicadaAte: number };
+export const PARAMETROS_PADRAO: Parametros = { tolerancia: TOLERANCIA_ATRASO_MIN, ausenteApos: AUSENTE_APOS_MIN, alertaIntervalo: INTERVALO_ALERTA_MIN, margemEncerramento: MARGEM_ENCERRAMENTO_MIN, limiteRetorno: LIMITE_RETORNO_INTERVALO_MIN, trocaAntes: TROCA_TURNO_ANTES_MIN, trocaDepois: TROCA_TURNO_DEPOIS_MIN, duplicadaAte: DUPLICADA_ATE_MIN };
 
 export type Situacao =
   | "aguardando" // ainda não chegou a hora (ou está dentro da tolerância, sem batida)
@@ -139,6 +139,30 @@ export function classificar(e: Entrada, p: Parametros = PARAMETROS_PADRAO): Aval
   if (encerrou) return { ...comum, situacao: "encerrou", semRetorno: !!j && n === 2 && ultima.minuto < j.fim - p.margemEncerramento };
   const minutos = Math.max(0, e.agoraMin - ultima.minuto);
   return { ...comum, situacao: "intervalo", minutosNoIntervalo: minutos, alertaIntervalo: minutos > p.alertaIntervalo };
+}
+
+// ---------------------------------------------------------------- batida duplicada
+
+export type BatidaDuplicada = { batida: Batida; anterior: Batida; fim: boolean }; // fim: duplicada de saída (e não de entrada)
+
+/**
+ * Leitura do BlackPoke: ignora a batida que veio a poucos minutos da anterior no começo (entrada duplicada) e no fim do dia
+ * (saída duplicada). A do meio (saída para o intervalo e retorno muito próximos) NÃO é tratada aqui: segue como "intervalo curto".
+ * Sem isso os pares ficam deslocados e tudo depois da duplicada é lido ao contrário (como faz o Secullum).
+ */
+export function ignorarDuplicadas(b: Batida[], p: Parametros = PARAMETROS_PADRAO): { usadas: Batida[]; duplicadas: BatidaDuplicada[] } {
+  let usadas = [...b];
+  const duplicadas: BatidaDuplicada[] = [];
+  if (usadas.length >= 2 && usadas[1].minuto - usadas[0].minuto <= p.duplicadaAte) {
+    duplicadas.push({ batida: usadas[1], anterior: usadas[0], fim: false });
+    usadas = [usadas[0], ...usadas.slice(2)];
+  }
+  const n = usadas.length;
+  if (n >= 4 && usadas[n - 1].minuto - usadas[n - 2].minuto <= p.duplicadaAte) {
+    duplicadas.push({ batida: usadas[n - 1], anterior: usadas[n - 2], fim: true });
+    usadas = usadas.slice(0, n - 1);
+  }
+  return { usadas, duplicadas };
 }
 
 // ---------------------------------------------------------------- posição das batidas

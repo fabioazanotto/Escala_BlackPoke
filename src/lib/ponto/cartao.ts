@@ -121,7 +121,7 @@ function celulaBatida(d: DiaMes, i: number): string {
   if (!oficial) return "";
   if (!HORA.test(oficial)) return oficial; // texto do Secullum (ex.: FOLGA, justificativa)
   const hora = oficial.slice(0, 5);
-  const manual = d.batidas.some((x) => x.manual && x.hora.slice(0, 5) === hora);
+  const manual = (d.todasBatidas ?? d.batidas).some((x) => x.manual && x.hora.slice(0, 5) === hora);
   return hora + (manual ? "*" : "");
 }
 

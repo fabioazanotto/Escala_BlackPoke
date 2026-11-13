@@ -4,7 +4,7 @@
 
 import { somarDiasData } from "@/lib/vendas/datas";
 import { DIA_DE_TRABALHO_VIRA_AS } from "@/config/ponto";
-import { PARAMETROS_PADRAO, ROTULO_SITUACAO, batidasDoDia, classificar, deMinutos, inferirTurno, paraMinutos, retornoEmAbertoDe, type Avaliacao, type Jornada, type Parametros } from "./aoVivo";
+import { PARAMETROS_PADRAO, ROTULO_SITUACAO, batidasDoDia, classificar, deMinutos, ignorarDuplicadas, inferirTurno, paraMinutos, retornoEmAbertoDe, type Avaliacao, type Jornada, type Parametros } from "./aoVivo";
 
 export type RegistroCompleto = { data: string; hora: string; tipo: number };
 export type InfoDiaSecullum = { folga: boolean; justificativa: string | null };
@@ -32,7 +32,9 @@ export type DiaMes = {
   escala: string | null; // o que a escala diz (rótulo)
   previsto: string | null;
   fontePrevisto: "escala" | "secullum" | null;
-  batidas: { hora: string; manual: boolean }[];
+  batidas: { hora: string; manual: boolean }[]; // a leitura do BlackPoke (sem a batida duplicada)
+  todasBatidas: { hora: string; manual: boolean; duplicada: boolean }[]; // tudo o que o Secullum recebeu no dia
+  duplicadas: { hora: string; apos: string; minutos: number; fim: boolean }[]; // possíveis duplicadas (ignoradas na leitura)
   avaliacao: Avaliacao | null;
   rotulo: string;
   trabalhadoMin: number;
@@ -59,6 +61,7 @@ export type ResumoMes = {
   saidasAntecipadas: number;
   semSaida: number;
   retornosEmAberto: number;
+  diasComDuplicada: number;
   turnosDeduzidos: number;
   semIntervalo: number;
   intervalosCurtos: number;
@@ -130,7 +133,9 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
   for (let dia = `${e.mes}-01`; dia <= ultimo; dia = somarDiasData(dia, 1)) {
     const futuro = dia > e.hoje;
     const agoraDia = futuro ? -1 : dia < e.hoje ? 1440 + DIA_DE_TRABALHO_VIRA_AS * 60 : e.agoraMin;
-    const b = batidasDoDia(e.registros, dia);
+    const brutas = batidasDoDia(e.registros, dia);
+    const leitura = ignorarDuplicadas(brutas, p);
+    const b = leitura.usadas;
     const n = b.length;
     const esc = e.escala?.get(dia) ?? null;
     const hor = e.horario(dia);
@@ -173,7 +178,8 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
         const descontoMin = minutosOficiais(oficial["Faltas"]) + minutosOficiais(oficial["Atras."]);
         const nossoAtraso = avaliacao.atrasoMin ?? 0;
         if (descontoMin > 0 && nossoAtraso === 0 && saidaAntecipadaMin === null) {
-          divergencias.push(`O Secullum descontou ${duracao(descontoMin)} (faltas/atrasos) e o BlackPoke não vê atraso nem saída antecipada${semSaida || retornoEmAberto ? " (há batida faltando neste dia)" : ""}`);
+          const causa = leitura.duplicadas.length > 0 ? ` — provável causa: batida duplicada (${leitura.duplicadas.map((d) => d.batida.hora).join(", ")}); o Secullum pareia as batidas em sequência e tudo depois dela fica deslocado` : semSaida || retornoEmAberto ? " (há batida faltando neste dia)" : "";
+          divergencias.push(`O Secullum descontou ${duracao(descontoMin)} (faltas/atrasos) e o BlackPoke não vê atraso nem saída antecipada${causa}`);
         } else if (nossoAtraso > 0 && descontoMin === 0) {
           divergencias.push(`Atraso de ${nossoAtraso} min no BlackPoke; o Secullum não descontou nada (tolerância ou compensação lá)`);
         }
@@ -190,6 +196,8 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
       previsto,
       fontePrevisto: fonte ?? (jornadaMostrada ? (temEscala && jornadaEscala ? "escala" : "secullum") : null),
       batidas: b.map((x) => ({ hora: x.hora, manual: x.manual })),
+      todasBatidas: brutas.map((x) => ({ hora: x.hora, manual: x.manual, duplicada: leitura.duplicadas.some((d) => d.batida === x) })),
+      duplicadas: leitura.duplicadas.map((d) => ({ hora: d.batida.hora, apos: d.anterior.hora, minutos: d.batida.minuto - d.anterior.minuto, fim: d.fim })),
       avaliacao,
       rotulo,
       trabalhadoMin: minutosTrabalhados(b),
@@ -200,7 +208,7 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
       semIntervalo,
       saidaAntecipadaMin,
       folgaTrabalhada,
-      manuais: b.filter((x) => x.manual).length,
+      manuais: brutas.filter((x) => x.manual).length,
       desconsideradas: contarDesconsideradas(e.registros, dia),
       justificativa: avaliacao?.situacao === "justificado" ? (avaliacao.motivo ?? justificativa) : justificativa,
       oficial,
@@ -218,6 +226,7 @@ export function montarMes(e: EntradaMes): { dias: DiaMes[]; resumo: ResumoMes } 
     saidasAntecipadas: passados.filter((d) => d.saidaAntecipadaMin !== null).length,
     semSaida: passados.filter((d) => d.semSaida).length,
     retornosEmAberto: passados.filter((d) => d.retornoEmAberto).length,
+    diasComDuplicada: passados.filter((d) => d.duplicadas.length > 0).length,
     turnosDeduzidos: passados.filter((d) => d.turnoDeduzido !== null).length,
     semIntervalo: passados.filter((d) => d.semIntervalo).length,
     intervalosCurtos: passados.filter((d) => d.avaliacao!.intervaloCurtoMin !== null).length,
@@ -246,6 +255,8 @@ export function pontosDeAtencao(dias: DiaMes[], resumo: ResumoMes, temEscala: bo
   if (atrasos.length) out.push(`Atrasos: ${atrasos.length}, somando ${resumo.atrasoTotalMin} min — ${atrasos.map((d) => `${dm(d.dia)} (${d.avaliacao!.atrasoMin} min)`).join(", ")}`);
   const semSaida = f((d) => d.semSaida);
   if (semSaida.length) out.push(`Batida faltando (número ímpar de batidas): ${semSaida.length} — ${lista(semSaida)}`);
+  const dupl = f((d) => d.duplicadas.length > 0);
+  if (dupl.length) out.push(`Possível batida duplicada: ${dupl.length} — ${dupl.map((d) => `${dm(d.dia)} (${d.duplicadas.map((x) => x.hora).join(", ")})`).join(", ")}. A leitura do BlackPoke ignora essas batidas; o Secullum não.`);
   const retornos = f((d) => d.retornoEmAberto);
   if (retornos.length) out.push(`Retorno do intervalo sem registro (a última batida foi tratada como saída): ${retornos.length} — ${lista(retornos)}`);
   const trocas = f((d) => d.turnoDeduzido !== null);

@@ -52,8 +52,9 @@ function seloAndamento(a: Avaliacao): Selo | null {
 }
 
 /** Detalhes em texto: o que o selo não diz. */
-function detalhes(a: Avaliacao, visao: Visao, turnoDeduzido?: "dia" | "noite" | null): string[] {
+function detalhes(a: Avaliacao, visao: Visao, turnoDeduzido?: "dia" | "noite" | null, duplicadas?: string[]): string[] {
   const d: string[] = [];
+  if (duplicadas && duplicadas.length > 0) d.push(`Possível batida duplicada (${duplicadas.join(", ")}): ignorada na leitura`);
   if (turnoDeduzido) d.push(`Horário do turno da ${turnoDeduzido === "noite" ? "noite" : "manhã"} usado (deduzido pelas batidas)`);
   if (a.situacao === "intervalo" && a.minutosNoIntervalo !== null) d.push(`Em intervalo há ${duracao(a.minutosNoIntervalo)}${a.alertaIntervalo ? ` ⚠ passou de ${INTERVALO_ALERTA_MIN} min` : ""}`);
   if (visao === "escala" && a.atrasoMin !== null) d.push(`Chegou ${a.atrasoMin} min depois do previsto`);
@@ -94,7 +95,7 @@ function Chip({ selo }: { selo: Selo }) {
 function Situacao({ p, visao }: { p: PessoaAoVivo; visao: Visao }) {
   const selo = visao === "escala" ? seloEscala(p.avaliacao, p.foraDaEscala) : seloPonto(p.avaliacao);
   const andamento = visao === "escala" && !p.foraDaEscala ? seloAndamento(p.avaliacao) : null;
-  const extra = detalhes(p.avaliacao, visao, p.turnoDeduzido);
+  const extra = detalhes(p.avaliacao, visao, p.turnoDeduzido, p.duplicadas);
   return (
     <>
       <span className="inline-flex flex-wrap gap-1">

@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LOJAS_XMENU } from "@/config/lojas";
 import { valorDoCampo } from "@/lib/integracoes/secullum";
-import { ROTULO_SITUACAO, ORDEM_SITUACAO, agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, inferirTurno, jornadaDe, type Avaliacao, type Jornada } from "@/lib/ponto/aoVivo";
+import { ROTULO_SITUACAO, ORDEM_SITUACAO, agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, ignorarDuplicadas, inferirTurno, jornadaDe, type Avaliacao, type Jornada } from "@/lib/ponto/aoVivo";
 import type { LojaAoVivo, PainelAoVivo, PessoaAoVivo } from "@/lib/ponto/aoVivoTipos";
 import { somarDiasData } from "@/lib/vendas/datas";
 import { comCache, reiniciarCache } from "./cacheCurto";
@@ -96,7 +96,13 @@ export async function montarAoVivo(db: SupabaseClient, agora = agoraNoBrasil()):
     if (id !== undefined && !justificativa.has(id)) justificativa.set(id, texto(valorDoCampo(a, "JustificativaNome")) || "Afastamento");
   }
 
-  const batidasDe = (id: number) => batidasDoDia(registros.get(id) ?? [], dia);
+  // Leitura do BlackPoke: a batida duplicada (a poucos minutos da anterior, no começo ou no fim do dia) é ignorada e fica avisada.
+  const duplicadasPorId = new Map<number, string[]>();
+  const batidasDe = (id: number) => {
+    const leitura = ignorarDuplicadas(batidasDoDia(registros.get(id) ?? [], dia));
+    if (leitura.duplicadas.length > 0) duplicadasPorId.set(id, leitura.duplicadas.map((d) => d.batida.hora));
+    return leitura.usadas;
+  };
   const mostrar = (b: { hora: string; manual: boolean }[]) => ({ batidas: b.slice(0, 4).map((x) => ({ hora: x.hora, manual: x.manual })), batidasExtras: Math.max(0, b.length - 4) });
 
   // ---------- BlackPoke: colaboradores, vínculos, escala e jornadas
@@ -137,7 +143,7 @@ export async function montarAoVivo(db: SupabaseClient, agora = agoraNoBrasil()):
     const colab = colabDoFuncionario.get(f.id);
     const pessoa: PessoaAoVivo = {
       chave: `f${f.id}`, funcionarioId: f.id, nome: f.nome, loja, previsto: previsto.texto, fontePrevisto: previsto.texto ? "secullum" : null, ...mostrar(b), avaliacao: av, rotulo: rotuloDe(av),
-      escalaSituacao: colab ? (situacaoEscala.get(colab) ?? null) : null, foraDaEscala: false, semVinculo: !colab, unidade: null,
+      escalaSituacao: colab ? (situacaoEscala.get(colab) ?? null) : null, foraDaEscala: false, semVinculo: !colab, unidade: null, duplicadas: duplicadasPorId.get(f.id) ?? [],
     };
     pontoPorLoja.set(loja, [...(pontoPorLoja.get(loja) ?? []), pessoa]);
   }
@@ -187,7 +193,7 @@ export async function montarAoVivo(db: SupabaseClient, agora = agoraNoBrasil()):
     const loja = lojaDaEmpresa.get(f.empresaId) ?? null;
     const pessoa: PessoaAoVivo = {
       chave: `c${id}`, funcionarioId: f.id, nome: String(c.nome), loja, previsto: trabalha && jornada ? `${deMinutos(jornada.inicio)}–${deMinutos(jornada.fim)}` : null, fontePrevisto: trabalha ? "escala" : null, ...mostrar(b), avaliacao: av, rotulo: rotuloDe(av),
-      escalaSituacao: sit, foraDaEscala: !trabalha && b.length > 0, semVinculo: false, unidade, turnoDeduzido,
+      escalaSituacao: sit, foraDaEscala: !trabalha && b.length > 0, semVinculo: false, unidade, turnoDeduzido, duplicadas: duplicadasPorId.get(f.id) ?? [],
     };
     escalaPorLoja.set(loja, [...(escalaPorLoja.get(loja) ?? []), pessoa]);
   }

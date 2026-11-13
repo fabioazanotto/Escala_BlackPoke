@@ -31,6 +31,7 @@ function selosDoDia(d: DiaMes): Selo[] {
     default: out.push(a.atrasoMin !== null ? { texto: `Atrasado ${a.atrasoMin} min`, classe: "bg-amber-100 text-amber-900", marca: "▲" } : { texto: d.folgaTrabalhada ? "Trabalhou na folga" : "Presente", ...(d.folgaTrabalhada ? { classe: "bg-amber-100 text-amber-900", marca: "!" } : verde) });
   }
   if (d.semSaida) out.push({ texto: "Batida faltando", classe: "bg-amber-100 text-amber-900", marca: "!" });
+  if (d.duplicadas.length > 0) out.push({ texto: "Possível batida duplicada", classe: "bg-amber-100 text-amber-900", marca: "!" });
   if (d.retornoEmAberto) out.push({ texto: "Retorno do intervalo sem registro", classe: "bg-amber-100 text-amber-900", marca: "!" });
   if (d.turnoDeduzido) out.push({ texto: `Turno da ${d.turnoDeduzido === "noite" ? "noite" : "manhã"} (deduzido)`, classe: "bg-sky-100 text-sky-900", marca: "⇄" });
   return out;
@@ -202,6 +203,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
             <Cartao rotulo="Faltas" valor={r.faltas === null ? "—" : String(r.faltas)} apoio={r.faltas === null ? "sem escala: veja o oficial" : "escalado e sem nenhuma batida"} alerta={!!r.faltas} />
             <Cartao rotulo="Atrasos" valor={String(r.atrasos)} apoio={r.atrasos ? `${r.atrasoTotalMin} min no total` : undefined} alerta={r.atrasos > 0} />
             <Cartao rotulo="Batida faltando" valor={String(r.semSaida)} apoio="número ímpar de batidas" alerta={r.semSaida > 0} />
+            <Cartao rotulo="Possível batida duplicada" valor={String(r.diasComDuplicada)} apoio="dias" alerta={r.diasComDuplicada > 0} />
             <Cartao rotulo="Retorno do intervalo sem registro" valor={String(r.retornosEmAberto)} alerta={r.retornosEmAberto > 0} />
             <Cartao rotulo="Sem batida de intervalo" valor={String(r.semIntervalo)} alerta={r.semIntervalo > 0} />
             <Cartao rotulo="Intervalo < 1 hora" valor={String(r.intervalosCurtos)} alerta={r.intervalosCurtos > 0} />

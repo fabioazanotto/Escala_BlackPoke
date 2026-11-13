@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, inferirTurno, jornadaDe, paraMinutos, posicionar, retornoEmAbertoDe, type Batida } from "./aoVivo";
+import { agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, ignorarDuplicadas, inferirTurno, jornadaDe, paraMinutos, posicionar, retornoEmAbertoDe, type Batida } from "./aoVivo";
 
 const m = (h: string) => paraMinutos(h)!;
 const bat = (...horas: string[]): Batida[] => horas.map((h) => ({ minuto: m(h) < 300 ? m(h) + 1440 : m(h), hora: h, manual: false }));
@@ -157,5 +157,32 @@ describe("inferirTurno", () => {
     expect(inferirTurno(bat("12:30"), manha, noite)).toBe(false);
     expect(inferirTurno(bat("15:43"), manha, null)).toBe(false);
     expect(inferirTurno([], manha, noite)).toBe(false);
+  });
+});
+
+describe("ignorarDuplicadas", () => {
+  const horas = (b: Batida[]) => b.map((x) => x.hora);
+  it("entrada duplicada: a 2ª batida a poucos minutos da 1ª é ignorada", () => {
+    const r = ignorarDuplicadas(bat("08:45", "08:51", "15:07", "16:05"));
+    expect(horas(r.usadas)).toEqual(["08:45", "15:07", "16:05"]);
+    expect(r.duplicadas).toHaveLength(1);
+    expect(r.duplicadas[0]).toMatchObject({ fim: false });
+    expect(r.duplicadas[0].batida.hora).toBe("08:51");
+  });
+  it("saída duplicada no fim do dia", () => {
+    const r = ignorarDuplicadas(bat("16:00", "17:30", "18:30", "00:20", "00:21"));
+    expect(horas(r.usadas)).toEqual(["16:00", "17:30", "18:30", "00:20"]);
+    expect(r.duplicadas[0]).toMatchObject({ fim: true });
+  });
+  it("o caso do mês: 6 batidas, duplicada de entrada e de saída", () => {
+    expect(horas(ignorarDuplicadas(bat("08:45", "08:51", "15:07", "16:05", "17:20", "17:21")).usadas)).toEqual(["08:45", "15:07", "16:05", "17:20"]);
+  });
+  it("não mexe no intervalo curto (saída e retorno próximos) nem em batidas com mais de 10 minutos", () => {
+    expect(ignorarDuplicadas(bat("09:00", "12:00", "12:05")).duplicadas).toEqual([]);
+    expect(ignorarDuplicadas(bat("09:00", "09:11", "12:00")).duplicadas).toEqual([]);
+    expect(ignorarDuplicadas(bat("09:00", "09:10", "12:00")).duplicadas).toHaveLength(1);
+  });
+  it("duas batidas a poucos minutos viram só a entrada (a pessoa está trabalhando, não em intervalo)", () => {
+    expect(horas(ignorarDuplicadas(bat("16:00", "16:08")).usadas)).toEqual(["16:00"]);
   });
 });

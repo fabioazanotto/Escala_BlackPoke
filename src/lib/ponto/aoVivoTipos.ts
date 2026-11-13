@@ -17,6 +17,7 @@ export type PessoaAoVivo = {
   foraDaEscala: boolean; // bateu ponto sem estar escalado para trabalhar
   semVinculo: boolean; // colaborador sem ligação com o Secullum: não dá para saber o que bateu
   unidade: string | null;
+  duplicadas?: string[]; // horas das batidas tratadas como possível duplicada (ignoradas na leitura)
   turnoDeduzido?: "dia" | "noite" | null; // trocou de turno só neste dia (deduzido pelas batidas)
 };
 

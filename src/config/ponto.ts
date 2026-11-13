@@ -26,6 +26,12 @@ export const LIMITE_RETORNO_INTERVALO_MIN = 70;
 export const TROCA_TURNO_ANTES_MIN = 120;
 export const TROCA_TURNO_DEPOIS_MIN = 60;
 
+/**
+ * Batida a até tantos minutos da anterior, no começo do dia (entrada) ou no fim (saída), é tratada como POSSÍVEL DUPLICADA
+ * (quem chega não sai para o intervalo em minutos). Só a leitura do BlackPoke ignora a duplicada; o Secullum continua como está.
+ */
+export const DUPLICADA_ATE_MIN = 10;
+
 /** Saída do intervalo muito perto do fim do turno conta como encerramento. */
 export const MARGEM_ENCERRAMENTO_MIN = 30;
 

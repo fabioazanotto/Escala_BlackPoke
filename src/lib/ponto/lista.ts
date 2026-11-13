@@ -49,14 +49,15 @@ export function situacaoDaLista(pessoas: PessoasDoFuncionario | undefined, ativo
   const a = p.avaliacao;
   const base = { previsto: p.previsto, ultimaBatida: ultimaBatidaDe(p), alerta: false };
   const foraEscala = p.foraDaEscala ? "Fora da escala hoje" : null;
+  const dup = p.duplicadas && p.duplicadas.length > 0 ? `Possível batida duplicada (${p.duplicadas.join(", ")})` : null;
   const turno = p.turnoDeduzido ? `Turno da ${p.turnoDeduzido === "noite" ? "noite" : "manhã"} (deduzido pelas batidas)` : null;
   const juntar = (...t: (string | null)[]) => t.filter(Boolean).join(" · ") || null;
 
   switch (a.situacao) {
     case "trabalhando":
-      return { ...base, status: "trabalhando", rotulo: "Trabalhando", detalhe: juntar(foraEscala, turno, a.atrasoMin !== null ? `Chegou ${a.atrasoMin} min depois do previsto` : null) };
+      return { ...base, status: "trabalhando", rotulo: "Trabalhando", detalhe: juntar(foraEscala, turno, dup, a.atrasoMin !== null ? `Chegou ${a.atrasoMin} min depois do previsto` : null) };
     case "intervalo":
-      return { ...base, status: "intervalo", rotulo: "Em intervalo", alerta: a.alertaIntervalo, detalhe: juntar(foraEscala, turno, a.minutosNoIntervalo !== null ? `Há ${duracao(a.minutosNoIntervalo)}${a.alertaIntervalo ? " ⚠ passou do limite" : ""}` : null) };
+      return { ...base, status: "intervalo", rotulo: "Em intervalo", alerta: a.alertaIntervalo, detalhe: juntar(foraEscala, turno, dup, a.minutosNoIntervalo !== null ? `Há ${duracao(a.minutosNoIntervalo)}${a.alertaIntervalo ? " ⚠ passou do limite" : ""}` : null) };
     case "atrasado_sem_registro":
       return { ...base, status: "atrasado", rotulo: "Atrasado", detalhe: a.minutosSemRegistro !== null ? `Sem registro há ${a.minutosSemRegistro} min` : "Sem registro" };
     case "ausente":
@@ -66,7 +67,7 @@ export function situacaoDaLista(pessoas: PessoasDoFuncionario | undefined, ativo
     case "justificado":
       return { ...base, status: "justificado", rotulo: a.motivo ? `Justificado: ${a.motivo}` : "Justificado", detalhe: null };
     case "encerrou":
-      return { ...base, status: "fora", rotulo: "Fora do horário", detalhe: juntar(foraEscala, turno, "Turno encerrado", a.retornoEmAberto ? "Retorno do intervalo sem registro" : null) };
+      return { ...base, status: "fora", rotulo: "Fora do horário", detalhe: juntar(foraEscala, turno, dup, "Turno encerrado", a.retornoEmAberto ? "Retorno do intervalo sem registro" : null) };
     case "folga":
       return { ...base, status: "fora", rotulo: "Fora do horário", detalhe: juntar(foraEscala, "Folga") };
     case "aguardando":

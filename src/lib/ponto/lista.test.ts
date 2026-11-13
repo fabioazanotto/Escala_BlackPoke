@@ -40,6 +40,12 @@ describe("situacaoDaLista", () => {
     expect(situacaoDaLista(undefined, true).status).toBe("sem_info");
     expect(situacaoDaLista({ ponto: pessoa(1, av("trabalhando")) }, false).status).toBe("desligado");
   });
+  it("avisa possível batida duplicada", () => {
+    expect(s(av("trabalhando"), { duplicadas: ["08:51"] }).detalhe).toBe("Possível batida duplicada (08:51)");
+  });
+  it("encerrou com retorno do intervalo sem registro avisa", () => {
+    expect(s(av("encerrou", { retornoEmAberto: true })).detalhe).toBe("Turno encerrado · Retorno do intervalo sem registro");
+  });
   it("dados desatualizados não viram ausência", () => {
     expect(s(av("sem_registro_desatualizado")).status).toBe("sem_info");
   });

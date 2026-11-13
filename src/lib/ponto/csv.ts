@@ -18,6 +18,8 @@ export function observacoesDoDia(d: DiaMes): string[] {
   const a = d.avaliacao;
   if (!a) return o;
   if (a.atrasoMin !== null) o.push(`Chegou ${a.atrasoMin} min depois do previsto`);
+  for (const x of d.duplicadas) o.push(`Possível batida duplicada: ${x.hora} (${x.minutos} min ${x.fim ? "depois da anterior" : `depois de ${x.apos}`}); a leitura ignora essa batida`);
+  if (d.todasBatidas.length > 4 || d.duplicadas.length > 0) o.push(`Todas as batidas: ${d.todasBatidas.map((b) => b.hora + (b.duplicada ? " (duplicada?)" : "") + (b.manual ? " (manual)" : "")).join(" · ")}`);
   if (d.semSaida) o.push("Batida faltando (número ímpar de batidas)");
   if (d.retornoEmAberto) o.push("Retorno do intervalo sem registro (a última batida foi tratada como saída)");
   if (d.turnoDeduzido) o.push(`Horário do turno da ${d.turnoDeduzido === "noite" ? "noite" : "manhã"} usado (deduzido pelas batidas)`);

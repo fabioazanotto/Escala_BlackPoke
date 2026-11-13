@@ -39,6 +39,7 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   vinda da mesma classificação da tela "Ponto ao vivo" (`src/lib/ponto/lista.ts`, `ListaColaboradoresPonto.tsx`; atualiza a cada minuto); busca por nome e filtro por loja. Tocar no nome abre o mês; "← Voltar à lista" volta.
   Regras das batidas (parâmetros em `src/config/ponto.ts`): com 3 batidas, se a 3ª vem mais de 70 min depois da saída para o intervalo, ela é a SAÍDA e o retorno fica "sem registro" (`retornoEmAbertoDe`, `posicionar`);
   quem bate no horário do outro turno (janela de 2h antes a 1h depois do início dele, fora da janela do próprio) é medido pelo outro turno, sem atraso, com aviso "deduzido" (`inferirTurno`).
+  Batida a até 10 min da anterior no começo ou no fim do dia é "possível duplicada": a leitura do BlackPoke a ignora (`ignorarDuplicadas`) e avisa; o Secullum não ignora e pareia tudo deslocado (daí descontos grandes).
   As colunas Faltas/Atras. do Secullum são HORAS descontadas (não só falta de dia inteiro): as divergências comparam o total descontado.
   Histórico do colaborador (aba "Histórico" em Ponto por colaborador, só admin; tabela `ocorrencias_colaborador`, SQL em `supabase/escala/17_historico_colaborador.sql`; lógica em `src/lib/ponto/historico.ts`):
   faltas e atrasos guardados do mês (botão explícito; só dias escalados e encerrados) e lançamentos manuais (atestado só com datas, nunca CID; advertência; observação). Chave: código do funcionário no Secullum.

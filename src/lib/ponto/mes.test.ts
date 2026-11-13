@@ -202,3 +202,24 @@ describe("divergências com o Secullum (colunas Faltas e Atras. são horas desco
     expect(dia(montarMes(base({ escala: escalaTodos("trabalha"), registros, oficial })), "2026-11-02").divergencias).toEqual([]);
   });
 });
+
+describe("batida duplicada", () => {
+  const d03 = () => {
+    const registros = ["08:45", "08:51", "15:07", "16:05", "17:20", "17:21"].map((h) => reg("2026-11-03", h));
+    const oficial = new Map([["2026-11-03", { Faltas: "06:09", "Atras.": "" }]]);
+    return montarMes(base({ escala: escalaTodos("trabalha", manha), registros, oficial }));
+  };
+  it("lê o dia sem as duplicadas: pares certos, horas certas, sem 'batida faltando'", () => {
+    const d = dia(d03(), "2026-11-03");
+    expect(d.batidas.map((b) => b.hora)).toEqual(["08:45", "15:07", "16:05", "17:20"]);
+    expect(d.todasBatidas.map((b) => [b.hora, b.duplicada])).toEqual([["08:45", false], ["08:51", true], ["15:07", false], ["16:05", false], ["17:20", false], ["17:21", true]]);
+    expect(d.duplicadas.map((x) => [x.hora, x.apos, x.minutos, x.fim])).toEqual([["08:51", "08:45", 6, false], ["17:21", "17:20", 1, true]]);
+    expect(d.semSaida).toBe(false);
+    expect(d.trabalhadoMin).toBe(15 * 60 + 7 - (8 * 60 + 45) + (17 * 60 + 20 - (16 * 60 + 5)));
+  });
+  it("explica o desconto do Secullum pela duplicada e conta no resumo e nos pontos de atenção", () => {
+    const r = d03();
+    expect(dia(r, "2026-11-03").divergencias.join()).toContain("batida duplicada (08:51, 17:21)");
+    expect(r.resumo.diasComDuplicada).toBe(1);
+  });
+});
