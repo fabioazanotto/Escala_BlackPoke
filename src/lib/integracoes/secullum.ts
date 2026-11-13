@@ -77,7 +77,7 @@ export type Dependencias = {
 
 const PADRAO = { esperaMs: 800, tentativas: 3, tempoLimiteMs: 20000 };
 
-function juntar(d: Partial<Dependencias>): Dependencias {
+export function juntar(d: Partial<Dependencias>): Dependencias {
   return {
     env: d.env ?? process.env,
     fetchFn: d.fetchFn ?? fetch,
@@ -87,7 +87,7 @@ function juntar(d: Partial<Dependencias>): Dependencias {
   };
 }
 
-const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Parametros = Record<string, string | number | boolean | null | undefined>;
 
@@ -98,7 +98,7 @@ export function montarUrl(caminho: string, params: Parametros = {}): string {
 }
 
 /** Fetch com tempo limite; erros de rede viram ErroSecullum sem expor o endereço completo nem dados. */
-async function requisitar(dep: Dependencias, url: string, init: RequestInit): Promise<Response> {
+export async function requisitar(dep: Dependencias, url: string, init: RequestInit): Promise<Response> {
   const controle = new AbortController();
   const relogio = setTimeout(() => controle.abort(), dep.tempoLimiteMs);
   try {
@@ -111,7 +111,7 @@ async function requisitar(dep: Dependencias, url: string, init: RequestInit): Pr
   }
 }
 
-function erroDoStatus(status: number, detalhe: string): ErroSecullum {
+export function erroDoStatus(status: number, detalhe: string): ErroSecullum {
   if (status === 401 || status === 403) return new ErroSecullum("NAO_AUTORIZADO", "O Secullum recusou o acesso (login inválido, conta não autorizada no banco ou sem permissão).", status);
   if (status === 400) return new ErroSecullum("REQUISICAO_INVALIDA", `O Secullum não aceitou o pedido${detalhe ? `: ${detalhe}` : "."}`, status);
   if (status === 429) return new ErroSecullum("LIMITE_DE_CHAMADAS", "O Secullum pediu para esperar (limite de chamadas).", status);
@@ -119,7 +119,7 @@ function erroDoStatus(status: number, detalhe: string): ErroSecullum {
 }
 
 /** Mensagem do HTTP 400 do Secullum: lista de { Property, Message } (só os textos de validação, sem dados). */
-async function detalheDoErro(resp: Response): Promise<string> {
+export async function detalheDoErro(resp: Response): Promise<string> {
   try {
     const corpo = (await resp.json()) as unknown;
     if (Array.isArray(corpo)) {

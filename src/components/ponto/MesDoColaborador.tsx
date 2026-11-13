@@ -9,6 +9,7 @@ import { ListaColaboradoresPonto } from "@/components/ponto/ListaColaboradoresPo
 import { CartaoPonto } from "@/components/ponto/CartaoPonto";
 import { chamar } from "@/components/ponto/chamar";
 import { HistoricoColaborador } from "@/components/ponto/HistoricoColaborador";
+import { PainelEscrita, type ConfigEscrita } from "@/components/ponto/PainelEscrita";
 import { useSessao } from "@/components/Sessao";
 import { hojeNoBrasil } from "@/lib/vendas/datas";
 
@@ -46,6 +47,12 @@ function Chip({ s }: { s: Selo }) {
   );
 }
 
+/** Ação de escrita possível num dia (só creator): justificar dia passado sem batida, ou remover justificativa do Secullum. */
+function acaoDoDia(d: DiaMes, hoje: string): "justificar" | "remover" | null {
+  if (d.futuro || d.dia >= hoje || d.batidas.length > 0 || d.todasBatidas.length > 0) return null;
+  return d.justificativa ? "remover" : "justificar";
+}
+
 const somarMeses = (mes: string, n: number) => {
   const [a, m] = mes.split("-").map(Number);
   const t = a * 12 + (m - 1) + n;
@@ -73,7 +80,9 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
   const [oficial, setOficial] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(inicialFuncionario === null);
   const [visao, setVisao] = useState<"mes" | "historico" | "cartao">("mes");
-  const { perfil } = useSessao();
+  const { perfil, creator } = useSessao();
+  const [escrita, setEscrita] = useState<ConfigEscrita | null>(null);
+  const [hoje] = useState(() => hojeNoBrasil());
 
   useEffect(() => {
     let ativo = true;
@@ -173,6 +182,8 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
       {selecionado && !mostrarLista && visao === "historico" && (
         <HistoricoColaborador funcionarioId={selecionado.id} nome={selecionado.nome} colaboradorId={dados?.funcionario.id === selecionado.id ? (dados.colaborador?.id ?? null) : null} mesAtual={mes} dadosDoMes={dados?.funcionario.id === selecionado.id ? dados : null} quemLanca={perfil.nome} />
       )}
+
+      {escrita && <PainelEscrita config={escrita} onFechar={() => setEscrita(null)} onConcluido={() => funcionarioId !== null && void carregar(funcionarioId, mes)} />}
 
       {selecionado && !mostrarLista && visao === "cartao" && <CartaoPonto funcionarioId={selecionado.id} mes={mes} nome={selecionado.nome} />}
 
@@ -304,6 +315,11 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
                         <td className="py-2 pr-3 tabular-nums">{d.trabalhadoMin > 0 ? duracao(d.trabalhadoMin) : "—"}</td>
                         <td className="py-2 pr-3">
                           <span className="inline-flex flex-wrap gap-1">{d.futuro ? "—" : selosDoDia(d).map((s) => <Chip key={s.texto} s={s} />)}</span>
+                          {creator && selecionado && acaoDoDia(d, hoje) && (
+                            <button type="button" className="mt-1 block rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50" onClick={() => setEscrita({ tipo: acaoDoDia(d, hoje) === "remover" ? "remover_justificativa" : "justificar", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia })}>
+                              {acaoDoDia(d, hoje) === "remover" ? "Remover justificativa" : "Justificar"}
+                            </button>
+                          )}
                           {obs.map((t) => (
                             <p key={t} className={`mt-0.5 text-xs ${t.startsWith("Divergência") ? "text-amber-900" : "text-neutral-700"}`}>
                               {t}
@@ -351,6 +367,11 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
                       <p className="text-xs text-neutral-600">{[d.escala, d.previsto].filter(Boolean).join(" · ") || "—"}</p>
                     </div>
                     {!d.futuro && <div className="mt-1 flex flex-wrap gap-1">{selosDoDia(d).map((s) => <Chip key={s.texto} s={s} />)}</div>}
+                    {creator && selecionado && acaoDoDia(d, hoje) && (
+                      <button type="button" className="mt-1.5 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800" onClick={() => setEscrita({ tipo: acaoDoDia(d, hoje) === "remover" ? "remover_justificativa" : "justificar", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia })}>
+                        {acaoDoDia(d, hoje) === "remover" ? "Remover justificativa" : "Justificar"}
+                      </button>
+                    )}
                     {d.batidas.length > 0 && <p className="mt-1 text-xs tabular-nums text-neutral-700">{(d.retornoEmAberto ? posicionar(d.batidas, true) : d.batidas).map((b) => (b ? b.hora + (b.manual ? " (manual)" : "") : "—")).join(" · ")} {d.trabalhadoMin > 0 && `· ${duracao(d.trabalhadoMin)}`}</p>}
                     {obs.map((t) => (
                       <p key={t} className={`mt-0.5 text-xs ${t.startsWith("Divergência") ? "text-amber-900" : "text-neutral-700"}`}>

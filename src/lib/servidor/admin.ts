@@ -1,9 +1,10 @@
 // Verificação de quem está chamando uma rota do servidor. Roda só no servidor.
 
 import { createClient } from "@supabase/supabase-js";
+import { ehCreator } from "@/lib/acesso";
 import type { PerfilAcesso } from "@/lib/tipos";
 
-export type Chamador = { usuarioId: string; perfil: PerfilAcesso } | null;
+export type Chamador = { usuarioId: string; perfil: PerfilAcesso; creator: boolean } | null;
 
 /** Confere o token de sessão do Supabase enviado no cabeçalho e devolve o perfil ativo, ou null. */
 export async function chamadorDaRequisicao(request: Request): Promise<Chamador> {
@@ -22,7 +23,7 @@ export async function chamadorDaRequisicao(request: Request): Promise<Chamador> 
   // A leitura passa pelas regras de acesso do banco: cada pessoa só enxerga o próprio perfil.
   const { data: perfil } = await db.from("perfis").select("perfil, ativo").eq("id", usuario.user.id).maybeSingle();
   if (!perfil || !perfil.ativo) return null;
-  return { usuarioId: usuario.user.id, perfil: perfil.perfil as PerfilAcesso };
+  return { usuarioId: usuario.user.id, perfil: perfil.perfil as PerfilAcesso, creator: perfil.perfil === "admin" && ehCreator(usuario.user) };
 }
 
 /** Cliente do Supabase que age COMO o usuário que chamou (as regras de acesso do banco continuam valendo). */

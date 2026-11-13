@@ -22,7 +22,7 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   Sincronização: `src/lib/vendas/sincronizar.ts` (lógica, testada) + `src/lib/servidor/sincronizarVendas.ts` (liga ao Xmenu e ao banco) + rota
   `POST /api/vendas/sincronizar` (admin logado ou cabeçalho `x-sincronizar-segredo` vindo do agendador do banco). Reescreve os últimos 3 dias a cada rodada.
   Variáveis na Vercel (Secret): `SUPABASE_SERVICE_ROLE_KEY` e `SINCRONIZAR_SEGREDO`. A chave de serviço só é usada em `src/lib/servidor/supabaseAdmin.ts`.
-- Ponto (Secullum Ponto Web, SOMENTE LEITURA, em construção; plano em `docs/plano-ponto-secullum.md`, contrato em `docs/secullum-api.md`):
+- Ponto (Secullum Ponto Web, LEITURA na integração principal; a escrita é um módulo separado, abaixo; em construção; plano em `docs/plano-ponto-secullum.md`, contrato em `docs/secullum-api.md`):
   cliente em `src/lib/integracoes/secullum.ts` com lista fixa de rotas permitidas (só GET e `Calcular`; escrita é recusada no código),
   rota de diagnóstico `/api/secullum/diagnostico` (só admin; devolve estrutura e contagens, nunca dados pessoais) e tela `/ponto` (aba "Ponto" do RH).
   Variáveis na Vercel (Secret): `SECULLUM_USUARIO` e `SECULLUM_SENHA` (conta própria da integração); `SECULLUM_BANCO_ID` só se a conta enxergar mais de um banco.
@@ -41,6 +41,10 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   quem bate no horário do outro turno (janela de 2h antes a 1h depois do início dele, fora da janela do próprio) é medido pelo outro turno, sem atraso, com aviso "deduzido" (`inferirTurno`).
   Batida a até 10 min da anterior no começo ou no fim do dia é "possível duplicada": a leitura do BlackPoke a ignora (`ignorarDuplicadas`) e avisa; o Secullum não ignora e pareia tudo deslocado (daí descontos grandes).
   As colunas Faltas/Atras. do Secullum são HORAS descontadas (não só falta de dia inteiro): as divergências comparam o total descontado.
+  ESCRITA no Secullum (só o creator; etapa 1 em MODO TESTE: só vale para funcionário cujo nome começa com "Teste", ver `src/config/escrita.ts`): justificar falta de dia sem batida, remover justificativa, lançar/apagar afastamento.
+  Conta SEPARADA da leitura (variáveis `SECULLUM_ESCRITA_USUARIO` e `SECULLUM_ESCRITA_SENHA` na Vercel, Secret) e lista fixa de 4 operações em `src/lib/integracoes/secullumEscrita.ts` (nunca apagar/alterar funcionário, empresa ou horário).
+  Fluxo: prévia do que vai mudar → confirmação → grava → relê o Secullum para conferir → auditoria sem CPF na tabela `secullum_escritas` (`supabase/escala/18_secullum_escritas.sql`).
+  Lógica pura em `src/lib/ponto/escrita.ts`, orquestração em `src/lib/servidor/pontoEscrita.ts`, rota `POST /api/ponto/escrita`, tela `PainelEscrita.tsx` (botão "Justificar" nos dias sem batida e "Afastamentos no Secullum" no Histórico).
   Histórico do colaborador (aba "Histórico" em Ponto por colaborador, só admin; tabela `ocorrencias_colaborador`, SQL em `supabase/escala/17_historico_colaborador.sql`; lógica em `src/lib/ponto/historico.ts`):
   faltas e atrasos guardados do mês (botão explícito; só dias escalados e encerrados) e lançamentos manuais (atestado só com datas, nunca CID; advertência; observação). Chave: código do funcionário no Secullum.
   Cartão Ponto (aba "Cartão ponto" em Ponto por colaborador, só admin): cópia no layout do Secullum (A4 paisagem, impressão pelo navegador), feita de `Calcular` + batidas lidas (`src/lib/ponto/cartao.ts`, rota `GET /api/ponto/cartao`).

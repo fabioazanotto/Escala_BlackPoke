@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { ROTULO_TIPO, ROTULO_TIPO_PLURAL, TIPOS_OCORRENCIA, contarPorTipo, ocorrenciasAutomaticasDoMes, validarManual, type NovaOcorrencia, type Ocorrencia, type TipoOcorrencia } from "@/lib/ponto/historico";
 import type { MesDoColaborador } from "@/lib/ponto/mesTipos";
+import { enviar } from "@/components/ponto/chamar";
+import { PainelEscrita, type ConfigEscrita } from "@/components/ponto/PainelEscrita";
+import { useSessao } from "@/components/Sessao";
+import type { AfastamentoLido } from "@/lib/ponto/escrita";
 import { supabase } from "@/lib/supabase";
 
 const COR_TIPO: Record<TipoOcorrencia, string> = {
@@ -35,6 +39,27 @@ export function HistoricoColaborador({ funcionarioId, nome, colaboradorId, mesAt
   const [minutos, setMinutos] = useState("");
   const [descricao, setDescricao] = useState("");
   const [filtro, setFiltro] = useState<TipoOcorrencia | null>(null);
+  const { creator } = useSessao();
+  const [afast, setAfast] = useState<AfastamentoLido[] | null>(null);
+  const [erroAfast, setErroAfast] = useState<string | null>(null);
+  const [escrita, setEscrita] = useState<ConfigEscrita | null>(null);
+
+  const carregarAfastamentos = useCallback(async () => {
+    if (!creator) return;
+    try {
+      const r = await enviar<{ afastamentos?: AfastamentoLido[] }>("/api/ponto/escrita", { acao: "listar_afastamentos", funcionario: funcionarioId });
+      setAfast(r.afastamentos ?? []);
+      setErroAfast(null);
+    } catch (e) {
+      setAfast(null);
+      setErroAfast((e as Error).message);
+    }
+  }, [creator, funcionarioId]);
+
+  useEffect(() => {
+    const t = setTimeout(() => void carregarAfastamentos(), 0);
+    return () => clearTimeout(t);
+  }, [carregarAfastamentos]);
 
   const carregar = useCallback(async () => {
     const { data, error } = await supabase()
@@ -224,6 +249,35 @@ export function HistoricoColaborador({ funcionarioId, nome, colaboradorId, mesAt
           </ul>
         )}
       </section>
+
+      {creator && (
+        <section className="cartao space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="mr-auto font-semibold">Afastamentos no Secullum</h3>
+            <button type="button" className="botao-secundario" disabled={!!erroAfast && afast === null} onClick={() => setEscrita({ tipo: "afastamento", funcionarioId, nome })}>
+              Lançar afastamento
+            </button>
+          </div>
+          {erroAfast && <p className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-700">{erroAfast}</p>}
+          {afast && afast.length === 0 && <p className="text-sm text-neutral-600">Nenhum afastamento de um ano para trás a um ano para frente.</p>}
+          {afast && afast.length > 0 && (
+            <ul className="divide-y divide-neutral-100">
+              {afast.map((a) => (
+                <li key={a.inicio + a.fim} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                  <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-900">{a.justificativa || "Afastamento"}</span>
+                  <span className="font-medium tabular-nums">{a.inicio === a.fim ? dataBR(a.inicio) : `${dataBR(a.inicio)} a ${dataBR(a.fim)}`}</span>
+                  {a.motivo && <span className="text-sm text-neutral-700">{a.motivo}</span>}
+                  <button type="button" className="botao-secundario ml-auto !px-3 !py-1.5 text-sm" onClick={() => setEscrita({ tipo: "remover_afastamento", funcionarioId, nome, inicio: a.inicio, fim: a.fim })}>
+                    Apagar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {escrita && <PainelEscrita config={escrita} onFechar={() => setEscrita(null)} onConcluido={() => void carregarAfastamentos()} />}
     </div>
   );
 }

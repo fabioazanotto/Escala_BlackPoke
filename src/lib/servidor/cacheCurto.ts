@@ -12,3 +12,8 @@ export async function comCache<T>(chave: string, ttlMs: number, f: () => Promise
 
 /** Só para testes. */
 export const reiniciarCache = () => cache.clear();
+
+/** Esquece as consultas guardadas cuja chave começa com o prefixo (depois de uma escrita, para a tela ler o dado novo). */
+export function limparCachePorPrefixo(prefixo: string) {
+  for (const k of [...cache.keys()]) if (k.startsWith(prefixo)) cache.delete(k);
+}
