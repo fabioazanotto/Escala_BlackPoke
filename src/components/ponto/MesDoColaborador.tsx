@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { COLUNAS_OFICIAIS, dataBR, montarCsv, observacoesDoDia } from "@/lib/ponto/csv";
 import { duracao, type DiaMes } from "@/lib/ponto/mes";
 import type { FuncionarioDaLista, MesDoColaborador } from "@/lib/ponto/mesTipos";
+import { HistoricoColaborador } from "@/components/ponto/HistoricoColaborador";
+import { useSessao } from "@/components/Sessao";
 import { supabase } from "@/lib/supabase";
 import { hojeNoBrasil } from "@/lib/vendas/datas";
 
@@ -76,6 +78,8 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
   const [carregando, setCarregando] = useState(false);
   const [oficial, setOficial] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(inicialFuncionario === null);
+  const [visao, setVisao] = useState<"mes" | "historico">("mes");
+  const { perfil } = useSessao();
 
   useEffect(() => {
     let ativo = true;
@@ -209,10 +213,24 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
         )}
       </div>
 
-      {erro && <p className="nao-imprimir rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
-      {carregando && !mostrarLista && <p className="text-sm text-neutral-600">Carregando o mês no Secullum…</p>}
+      {selecionado && !mostrarLista && (
+        <div role="tablist" aria-label="O que ver" className="nao-imprimir flex gap-1 border-b border-neutral-200">
+          {([["mes", "Mês"], ["historico", "Histórico"]] as const).map(([v, rot]) => (
+            <button key={v} type="button" role="tab" aria-selected={visao === v} onClick={() => setVisao(v)} className={`-mb-px border-b-2 px-4 py-2.5 text-sm ${visao === v ? "border-neutral-900 font-semibold" : "border-transparent text-neutral-600 hover:text-neutral-900"}`}>
+              {rot}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {dados && r && !carregando && !mostrarLista && (
+      {selecionado && !mostrarLista && visao === "historico" && (
+        <HistoricoColaborador funcionarioId={selecionado.id} nome={selecionado.nome} colaboradorId={dados?.funcionario.id === selecionado.id ? (dados.colaborador?.id ?? null) : null} mesAtual={mes} dadosDoMes={dados?.funcionario.id === selecionado.id ? dados : null} quemLanca={perfil.nome} />
+      )}
+
+      {erro && <p className="nao-imprimir rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
+      {carregando && !mostrarLista && visao === "mes" && <p className="text-sm text-neutral-600">Carregando o mês no Secullum…</p>}
+
+      {dados && r && !carregando && !mostrarLista && visao === "mes" && (
         <div className="space-y-4">
           <section className="cartao space-y-1">
             <h2 className="text-xl font-semibold">{dados.funcionario.nome}</h2>

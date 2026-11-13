@@ -109,3 +109,13 @@ Só nomes de campos e contagens; sem dados pessoais, IDs de banco ou CNPJs.
 - `GET /Pendencias` do manual não existe no Swagger.
 - Significado de `Origem = 16` e de `Tipo = 3` em detalhe (ver com o suporte Secullum se for relevante).
 - Campos de `FuncionariosAfastamentos` (sem registros para observar).
+
+## Gerador do Cartão Ponto (canal INTERNO do site, observado no navegador; NÃO é a API documentada)
+Observado pela extensão do Chrome em 12/11/2026 (sem tokens, CPF ou nomes). Serve só como registro; nada disto está implementado no app.
+- Imprimir: o site abre um **WebSocket** em `wss://pontowebrelatorios.secullum.com.br/` e envia `{ hubName: "RelatorioCartaoPonto", methodName: "Gerar", arguments: [{ FuncionarioId, EmpresaId, FuncaoId, DepartamentoId, EstruturaId, Filtro1Id, Filtro2Id, DataInicial, DataFinal, Opcoes{...}, ListaFuncionarios, BancoDeHoras, SituacaoFuncionarios }] }`.
+  Opções (booleanas): ModoPaisagem, ExibirTotaisNoRodape, ExibirMiniaturaDoHorario, ExibirTermosMTB, ExibirEventos, ExibirJustificativas, ExibirLegendasJustificativas, ExibirAtividades, Excel...; numéricas: Tipo, Ordenacao, formatoImpressao.
+- Logo depois de conectar, a página envia uma mensagem de autenticação `{ accessToken, group: "browser", protocolVersion: 5, headers: {...} }` (conteúdo dos headers não observado) e recebe `{ responseAuth: "ok" }`.
+- O servidor responde com eventos `Token` (guid), `Progresso`, `Sucesso` e `Erro`. O PDF NÃO vem nessa resposta.
+- Abrir: `GET https://pontowebrelatorios.secullum.com.br/RelatorioCartaoPonto/AbrirRelatorio?token=<guid>&formato=<n>&axpw=<jwt>&axpw_dbs=<id do banco>` devolve `application/pdf`. Antes, o site chama `GET pontoweb.secullum.com.br/ForcarAtualizacaoToken` (renova o token).
+- Dúvidas em aberto: de onde vem o `axpw` (JWT do site, provavelmente diferente do token da integração) e se o token da conta de integração é aceito nesse canal.
+- Decisão: não usar. É um canal não documentado, pensado para o navegador logado de uma pessoa; pode mudar sem aviso e exigiria autenticar como pessoa. O Cartão Ponto do app é montado com `Calcular` + batidas (ver plano).

@@ -36,6 +36,8 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
   lê o Secullum na hora e mostra, lado a lado, a leitura do BlackPoke (escala x batidas) e o cálculo oficial (`Calcular`); exporta CSV e imprime. Sem escala no mês, o app NÃO declara faltas.
   O menu do RH fica na barra lateral (subitens em `src/config/menu.ts`); só Configurações ainda usa abas no topo.
   "Ponto por colaborador": escolhe-se a unidade (botões) e aparecem os colaboradores ativos dela como botões; tocar abre o mês.
+  Histórico do colaborador (aba "Histórico" em Ponto por colaborador, só admin; tabela `ocorrencias_colaborador`, SQL em `supabase/escala/17_historico_colaborador.sql`; lógica em `src/lib/ponto/historico.ts`):
+  faltas e atrasos guardados do mês (botão explícito; só dias escalados e encerrados) e lançamentos manuais (atestado só com datas, nunca CID; advertência; observação). Chave: código do funcionário no Secullum.
   "Creator" (dono do sistema): marcador `app_metadata.creator = true` no login (SQL em `supabase/escala/16_creator.sql`; o usuário não consegue se promover). `useSessao().creator` (admin + marcador).
   RH > "Integração colaboradores" (`/integracao-colaboradores`, kit de boas-vindas por cargo): só o creator vê a página em construção; os demais veem "Em breve".
   A aba "Integração do ponto" (`/ponto-integracao`, em Configurações, só admin) reúne sincronização, conferência de funcionários, teste de conexão e "Nome completo e empresa pelo Secullum"
