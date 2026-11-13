@@ -119,3 +119,15 @@ Observado pela extensão do Chrome em 12/11/2026 (sem tokens, CPF ou nomes). Ser
 - Abrir: `GET https://pontowebrelatorios.secullum.com.br/RelatorioCartaoPonto/AbrirRelatorio?token=<guid>&formato=<n>&axpw=<jwt>&axpw_dbs=<id do banco>` devolve `application/pdf`. Antes, o site chama `GET pontoweb.secullum.com.br/ForcarAtualizacaoToken` (renova o token).
 - Dúvidas em aberto: de onde vem o `axpw` (JWT do site, provavelmente diferente do token da integração) e se o token da conta de integração é aceito nesse canal.
 - Decisão: não usar. É um canal não documentado, pensado para o navegador logado de uma pessoa; pode mudar sem aviso e exigiria autenticar como pessoa. O Cartão Ponto do app é montado com `Calcular` + batidas (ver plano).
+
+## Rotas de ESCRITA: contrato lido do manual (nada implementado; só leitura do manual, versão de 21/09/2026)
+Mesmo servidor da leitura (`.../IntegracaoExterna/`). Identificador do funcionário: Cpf, Pis ou NumeroFolha. Cada operação do cartão é unitária (uma por chamada).
+- `POST CartaoPonto/Manual` `{ Cpf, Data, Coluna (Entrada1..Saida5), Hora HH:mm, Motivo (obrigatório, 150) }`: inclui batida manual. ERRO se a coluna já tem batida ORIGINAL; se havia justificativa, ela e seu par são apagadas; pré-assinalada é substituída; manual existente é editada.
+- `POST CartaoPonto/Justificativa` `{ Cpf, Data, Grupo (1..5), Justificativa (nome abreviado, 7) }`: justifica um GRUPO de colunas (Grupo 1 = Entrada1+Saída1...). ERRO se qualquer batida do grupo for ORIGINAL; manual/pré-assinalada é sobrescrita.
+- `POST CartaoPonto/Troca` `{ Cpf, Data, ColunaOrigem, ColunaDestino }`: troca os valores de duas colunas. ERRO se origem ou destino tiver justificativa.
+- `POST CartaoPonto/TrocaDia` `{ Cpf, DataOrigem, Coluna, DataDestino }`: move uma batida para o dia anterior/posterior (no máximo 1 dia).
+- `DELETE CartaoPonto` (corpo JSON) `{ Cpf, Data, Coluna, Motivo (obrigatório) }`: apaga o valor de uma coluna (original exige motivo; justificativa apaga a coluna do grupo; célula vazia: nada acontece).
+- `POST FuncionariosAfastamentos` (`Cpf|Pis, Inicio, Fim, Motivo, JustificativaNome` obrigatória) e `DELETE` por funcionário.
+- `POST Funcionarios`: INCLUI OU ALTERA por CPF (upsert). Obrigatórios: Admissao, EmpresaCnpjCpf, HorarioNumero, DepartamentoDescricao, FuncaoDescricao (e Nome/Cpf). Desligar = enviar `Demissao` (+ `MotivoDemissaoDescricao`). Comportamento de campos omitidos NÃO documentado: testar com funcionário de teste antes. `DELETE Funcionarios` apaga a pessoa: NUNCA usar.
+- Não há rota para trocar o horário de UM dia nem para marcar "folga" no cartão. Mudança de horário permanente = `POST Funcionarios` com outro `HorarioNumero`. Folga por dia só via justificativa (cadastro `Justificativas` tem o campo `CalcularComoFolga`).
+- A conta de integração tem "Não permitir alterações de registros de ponto e cálculos" marcado (proteção de somente leitura): escrever exige OUTRA conta, com essa permissão liberada.
