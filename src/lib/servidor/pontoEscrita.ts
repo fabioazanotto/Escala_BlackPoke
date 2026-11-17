@@ -12,7 +12,7 @@ import {
   paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarData, validarPeriodo, validarVinculo, type AfastamentoLido, type Justificativa,
 } from "@/lib/ponto/escrita";
 import { somarDiasData } from "@/lib/vendas/datas";
-import { comCache, limparCachePorPrefixo } from "./cacheCurto";
+import { TTL_CADASTROS_MS, comCache, limparCachePorPrefixo } from "./cacheCurto";
 import { carregarContexto, traduzirFuncionarios } from "./pontoDados";
 
 export class ErroEscrita extends Error {}
@@ -42,7 +42,7 @@ async function preparar(db: SupabaseClient, funcionarioId: number) {
   if (!Number.isInteger(funcionarioId) || funcionarioId <= 0) throw new ErroEscrita("Informe o funcionário.");
   const { contexto } = await comCache("contexto", 10 * 60000, () => carregarContexto(db));
   const { sessao, empresas } = contexto;
-  const [funcsBrutos, horariosBrutos] = await Promise.all([comCache("funcionarios", 10 * 60000, () => sessao.obter("Funcionarios")), comCache("horarios", 10 * 60000, () => sessao.obter("Horarios"))]);
+  const [funcsBrutos, horariosBrutos] = await Promise.all([comCache("funcionarios", TTL_CADASTROS_MS, () => sessao.obter("Funcionarios")), comCache("horarios", TTL_CADASTROS_MS, () => sessao.obter("Horarios"))]);
   const f = traduzirFuncionarios(lista(funcsBrutos), empresas).funcionarios.find((x) => x.id === funcionarioId);
   if (!f) throw new ErroEscrita("Funcionário não encontrado nas empresas do projeto.");
   const bloqueio = liberadoParaEscrita(f.nome, MODO_TESTE_ESCRITA);
@@ -53,7 +53,7 @@ async function preparar(db: SupabaseClient, funcionarioId: number) {
   if (!bancos || bancos.length !== 1) throw new ErroEscrita("Configure exatamente um banco ativo do Secullum (tabela ponto_bancos).");
   const bruto = lista(funcsBrutos).find((x) => Number(valorDoCampo(x, "Id")) === funcionarioId);
   const horario = lista(horariosBrutos).find((h) => Number(valorDoCampo(h, "Id")) === Number(valorDoCampo(bruto, "HorarioId")));
-  const justificativas = listarJustificativas(await comCache("justificativas", 10 * 60000, () => sessao.obter("Justificativas")));
+  const justificativas = listarJustificativas(await comCache("justificativas", TTL_CADASTROS_MS, () => sessao.obter("Justificativas")));
   return {
     contexto, f, cpf, cpfSecullum: f.cpf, horario, justificativas,
     escrita: new SessaoSecullumEscrita(String(bancos[0].secullum_id)),
@@ -248,7 +248,7 @@ export async function processarEscrita(db: SupabaseClient, quem: Quem, pedido: P
   switch (pedido.acao) {
     case "opcoes": {
       const { contexto } = await comCache("contexto", 10 * 60000, () => carregarContexto(db));
-      const justificativas = listarJustificativas(await comCache("justificativas", 10 * 60000, () => contexto.sessao.obter("Justificativas")));
+      const justificativas = listarJustificativas(await comCache("justificativas", TTL_CADASTROS_MS, () => contexto.sessao.obter("Justificativas")));
       return { modoTeste: MODO_TESTE_ESCRITA, justificativas };
     }
     case "listar_afastamentos": {

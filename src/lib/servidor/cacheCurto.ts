@@ -17,3 +17,11 @@ export const reiniciarCache = () => cache.clear();
 export function limparCachePorPrefixo(prefixo: string) {
   for (const k of [...cache.keys()]) if (k.startsWith(prefixo)) cache.delete(k);
 }
+
+/** Cadastros do Secullum (funcionários, horários, justificativas) ficam guardados por pouco tempo: mudou lá, aparece aqui em até 2 minutos. */
+export const TTL_CADASTROS_MS = 2 * 60000;
+
+/** Esquece os cadastros e o que foi calculado com eles, para a próxima consulta buscar tudo de novo no Secullum (botão "Atualizar cadastros"). */
+export function esquecerCadastros() {
+  for (const prefixo of ["funcionarios", "horarios", "justificativas", "mes:", "batidas:", "afast:", "fonte:"]) limparCachePorPrefixo(prefixo);
+}

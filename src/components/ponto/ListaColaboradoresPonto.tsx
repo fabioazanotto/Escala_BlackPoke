@@ -27,7 +27,7 @@ function Selo({ status, texto, alerta }: { status: StatusLista; texto: string; a
   );
 }
 
-export function ListaColaboradoresPonto({ funcionarios, onAbrir, erroLista }: { funcionarios: ItemLista[] | null; onAbrir: (id: number) => void; erroLista: string | null }) {
+export function ListaColaboradoresPonto({ funcionarios, onAbrir, erroLista, onAtualizar, atualizando }: { funcionarios: ItemLista[] | null; onAbrir: (id: number) => void; erroLista: string | null; onAtualizar: () => void; atualizando: boolean }) {
   const [painel, setPainel] = useState<PainelAoVivo | null>(null);
   const [erroPainel, setErroPainel] = useState<string | null>(null);
   const [lojaSel, setLojaSel] = useState<string | null>(null);
@@ -79,7 +79,10 @@ export function ListaColaboradoresPonto({ funcionarios, onAbrir, erroLista }: { 
               {l.nome}
             </button>
           ))}
-        <label className="ml-auto flex items-center gap-2 text-sm text-neutral-700">
+        <button type="button" className="botao-secundario ml-auto !py-2" disabled={atualizando} onClick={onAtualizar} title="Lê os cadastros de novo no Secullum (novos funcionários, CPF, horários)">
+          {atualizando ? "Atualizando…" : "Atualizar cadastros"}
+        </button>
+        <label className="flex items-center gap-2 text-sm text-neutral-700">
           <input type="checkbox" className="h-5 w-5" checked={desligados} onChange={(e) => setDesligados(e.target.checked)} /> incluir desligados
         </label>
       </div>

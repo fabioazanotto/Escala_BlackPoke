@@ -83,6 +83,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
   const [visao, setVisao] = useState<"mes" | "historico" | "cartao">("mes");
   const { perfil, creator } = useSessao();
   const [escrita, setEscrita] = useState<ConfigEscrita | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
   const [hoje] = useState(() => hojeNoBrasil());
 
   useEffect(() => {
@@ -106,6 +107,22 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
     }
     setCarregando(false);
   }, []);
+
+  /** Busca os cadastros de novo no Secullum (ignora a memória curta do servidor) e, se um colaborador está aberto, relê o mês dele. */
+  const atualizarCadastros = useCallback(async () => {
+    setAtualizando(true);
+    try {
+      const r = await chamar<{ funcionarios: FuncionarioDaLista[] }>("/api/ponto/funcionarios?atualizar=1");
+      setLista(r.funcionarios);
+      setErro(null);
+      if (funcionarioId !== null) await carregar(funcionarioId, mes);
+    } catch (e) {
+      setErro((e as Error).message);
+    }
+    setAtualizando(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funcionarioId, mes]);
+
 
   useEffect(() => {
     if (funcionarioId === null) return;
@@ -143,7 +160,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
 
   return (
     <div className="space-y-4">
-      {mostrarLista && <ListaColaboradoresPonto funcionarios={lista} onAbrir={abrir} erroLista={funcionarioId === null ? erro : null} />}
+      {mostrarLista && <ListaColaboradoresPonto funcionarios={lista} onAbrir={abrir} erroLista={funcionarioId === null ? erro : null} onAtualizar={() => void atualizarCadastros()} atualizando={atualizando} />}
 
       {!mostrarLista && (
         <div className="nao-imprimir flex flex-wrap items-center gap-2">
@@ -189,7 +206,16 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
 
       {selecionado && !mostrarLista && visao === "cartao" && <CartaoPonto funcionarioId={selecionado.id} mes={mes} nome={selecionado.nome} />}
 
-      {erro && !mostrarLista && <p className="nao-imprimir rounded-xl bg-red-50 p-3 text-red-700">{erro}</p>}
+      {erro && !mostrarLista && (
+        <div className="nao-imprimir space-y-2 rounded-xl bg-red-50 p-3 text-red-700">
+          <p>{erro}</p>
+          {/não encontrado/i.test(erro) && (
+            <button type="button" className="botao-secundario" disabled={atualizando} onClick={() => void atualizarCadastros()}>
+              {atualizando ? "Atualizando…" : "Atualizar cadastros do Secullum e tentar de novo"}
+            </button>
+          )}
+        </div>
+      )}
       {carregando && !mostrarLista && visao === "mes" && <p className="text-sm text-neutral-600">Carregando o mês no Secullum…</p>}
 
       {dados && r && !carregando && !mostrarLista && visao === "mes" && (

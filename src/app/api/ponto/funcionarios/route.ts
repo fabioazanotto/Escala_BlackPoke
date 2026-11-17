@@ -1,6 +1,7 @@
 import { ErroSecullum } from "@/lib/integracoes/secullum";
 import { chamadorDaRequisicao, clienteDoChamador } from "@/lib/servidor/admin";
 import { ErroConfiguracaoPonto } from "@/lib/servidor/pontoDados";
+import { esquecerCadastros } from "@/lib/servidor/cacheCurto";
 import { listarFuncionarios } from "@/lib/servidor/pontoMes";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,8 @@ export async function GET(request: Request) {
   if (chamador.perfil !== "admin") return Response.json({ erro: "Sem permissão." }, { status: 403, headers: semCache });
   const db = clienteDoChamador(request);
   if (!db) return Response.json({ erro: "Sessão inválida." }, { status: 401, headers: semCache });
+  // ?atualizar=1: ignora a memória curta e lê os cadastros de novo no Secullum.
+  if (new URL(request.url).searchParams.get("atualizar") === "1") esquecerCadastros();
   try {
     return Response.json({ funcionarios: await listarFuncionarios(db) }, { headers: semCache });
   } catch (e) {

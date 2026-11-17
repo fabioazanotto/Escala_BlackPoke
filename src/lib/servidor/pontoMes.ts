@@ -9,7 +9,7 @@ import { montarCabecalho, type CabecalhoCartao } from "@/lib/ponto/cartao";
 import { mascararCpf } from "@/lib/ponto/conferencia";
 import { montarMes, parseCalcular, pontosDeAtencao, ultimoDiaDoMes, type DiaEscala, type InfoDiaSecullum } from "@/lib/ponto/mes";
 import { somarDiasData } from "@/lib/vendas/datas";
-import { comCache } from "./cacheCurto";
+import { TTL_CADASTROS_MS, comCache } from "./cacheCurto";
 import { carregarContexto, traduzirFuncionarios } from "./pontoDados";
 import { jornadaDoHorario } from "./pontoAoVivo";
 
@@ -23,7 +23,7 @@ export class ErroMes extends Error {}
 
 export async function listarFuncionarios(db: SupabaseClient) {
   const { contexto } = await comCache("contexto", 10 * 60000, () => carregarContexto(db));
-  const brutos = await comCache("funcionarios", 10 * 60000, () => contexto.sessao.obter("Funcionarios"));
+  const brutos = await comCache("funcionarios", TTL_CADASTROS_MS, () => contexto.sessao.obter("Funcionarios"));
   const { funcionarios } = traduzirFuncionarios(lista(brutos), contexto.empresas);
   const lojaDaEmpresa = new Map(contexto.empresas.map((e) => [e.empresaId, e.lojaChave ?? null]));
   return funcionarios
@@ -42,7 +42,7 @@ export async function montarMesDoColaborador(db: SupabaseClient, funcionarioId: 
 
   const { contexto } = await comCache("contexto", 10 * 60000, () => carregarContexto(db));
   const { sessao, empresas, bancoId } = contexto;
-  const [funcsBrutos, horariosBrutos] = await Promise.all([comCache("funcionarios", 10 * 60000, () => sessao.obter("Funcionarios")), comCache("horarios", 10 * 60000, () => sessao.obter("Horarios"))]);
+  const [funcsBrutos, horariosBrutos] = await Promise.all([comCache("funcionarios", TTL_CADASTROS_MS, () => sessao.obter("Funcionarios")), comCache("horarios", TTL_CADASTROS_MS, () => sessao.obter("Horarios"))]);
   const f = traduzirFuncionarios(lista(funcsBrutos), empresas).funcionarios.find((x) => x.id === funcionarioId);
   if (!f) throw new ErroMes("Funcionário não encontrado nas empresas do projeto.");
   const cpf = digitos(f.cpf);
@@ -170,7 +170,7 @@ export async function montarMesDoColaborador(db: SupabaseClient, funcionarioId: 
 export async function cabecalhoDoCartao(db: SupabaseClient, funcionarioId: number): Promise<CabecalhoCartao> {
   const { contexto, empresasApi } = await comCache("contexto", 10 * 60000, () => carregarContexto(db));
   const { sessao, empresas } = contexto;
-  const [funcsBrutos, horariosBrutos] = await Promise.all([comCache("funcionarios", 10 * 60000, () => sessao.obter("Funcionarios")), comCache("horarios", 10 * 60000, () => sessao.obter("Horarios"))]);
+  const [funcsBrutos, horariosBrutos] = await Promise.all([comCache("funcionarios", TTL_CADASTROS_MS, () => sessao.obter("Funcionarios")), comCache("horarios", TTL_CADASTROS_MS, () => sessao.obter("Horarios"))]);
   const funcionario = lista(funcsBrutos).find((x) => Number(valorDoCampo(x, "Id")) === funcionarioId);
   const empresaId = Number(valorDoCampo(funcionario, "EmpresaId"));
   if (!funcionario || !empresas.some((e) => e.empresaId === empresaId)) throw new ErroMes("Funcionário não encontrado nas empresas do projeto.");

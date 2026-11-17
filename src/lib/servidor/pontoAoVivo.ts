@@ -7,7 +7,7 @@ import { valorDoCampo } from "@/lib/integracoes/secullum";
 import { ROTULO_SITUACAO, ORDEM_SITUACAO, agoraNoBrasil, batidasDoDia, classificar, contar, deMinutos, diaDeTrabalho, ignorarDuplicadas, inferirTurno, jornadaDe, type Avaliacao, type Jornada } from "@/lib/ponto/aoVivo";
 import type { LojaAoVivo, PainelAoVivo, PessoaAoVivo } from "@/lib/ponto/aoVivoTipos";
 import { somarDiasData } from "@/lib/vendas/datas";
-import { comCache, reiniciarCache } from "./cacheCurto";
+import { TTL_CADASTROS_MS, comCache, reiniciarCache } from "./cacheCurto";
 import { carregarContexto, traduzirFuncionarios, type ContextoPonto } from "./pontoDados";
 
 const lista = (x: unknown) => (Array.isArray(x) ? x : []);
@@ -58,8 +58,8 @@ export async function montarAoVivo(db: SupabaseClient, agora = agoraNoBrasil()):
 
   // Secullum (somente leitura): cadastros em cache de 10 min; batidas do dia em cache de 20 s.
   const [funcsBrutos, horariosBrutos, fonte, agrupadas, afastamentos] = await Promise.all([
-    comCache("funcionarios", 10 * 60000, () => sessao.obter("Funcionarios")),
-    comCache("horarios", 10 * 60000, () => sessao.obter("Horarios")),
+    comCache("funcionarios", TTL_CADASTROS_MS, () => sessao.obter("Funcionarios")),
+    comCache("horarios", TTL_CADASTROS_MS, () => sessao.obter("Horarios")),
     comCache(`fonte:${dia}`, 20000, () => sessao.obter("FonteDados", { dataInicio: dia, dataFim: seguinte })),
     comCache(`batidas:${dia}`, 20000, () => sessao.obter("Batidas", { dataInicio: dia, dataFim: dia })),
     comCache(`afast:${dia}`, 60000, () => sessao.obter("FuncionariosAfastamentos", { dataInicio: dia, dataFim: dia })),
