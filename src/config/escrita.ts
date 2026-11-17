@@ -2,9 +2,10 @@
 
 /**
  * MODO TESTE: enquanto for `true`, o app só escreve no Secullum para funcionário cujo nome começa com "Teste".
- * Só mude para `false` depois de conferir, no próprio Secullum, o resultado dos testes.
+ * Desligado em 17/11/2026, depois de testar no Secullum: justificar, remover justificativa, lançar e apagar afastamento.
+ * A escrita continua só para o creator. Para voltar ao modo teste, troque para `true`.
  */
-export const MODO_TESTE_ESCRITA = true;
+export const MODO_TESTE_ESCRITA = false;
 export const PALAVRA_DO_FUNCIONARIO_TESTE = "teste";
 
 /** Janela de datas aceitas (em dias a partir de hoje) para justificar falta e lançar afastamento. */

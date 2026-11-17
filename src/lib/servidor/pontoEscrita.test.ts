@@ -15,6 +15,9 @@ const estado = vi.hoisted(() => ({
   auditoria: [] as Record<string, unknown>[],
 }));
 
+// Estes testes valem para o modo teste LIGADO, independente do que estiver em src/config/escrita.ts.
+vi.mock("@/config/escrita", async (importar) => ({ ...(await importar<typeof import("@/config/escrita")>()), MODO_TESTE_ESCRITA: true }));
+
 vi.mock("@/lib/integracoes/secullumEscrita", () => ({
   SessaoSecullumEscrita: class {
     async escrever(metodo: string, caminho: string, opcoes: { corpo?: Record<string, unknown>; params?: Record<string, unknown> } = {}) {
