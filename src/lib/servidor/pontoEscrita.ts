@@ -9,7 +9,7 @@ import { SessaoSecullumEscrita } from "@/lib/integracoes/secullumEscrita";
 import { agoraNoBrasil, diaDeTrabalho } from "@/lib/ponto/aoVivo";
 import {
   corpoAfastamento, corpoApagarColuna, corpoJustificar, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
-  paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarData, validarPeriodo, type AfastamentoLido, type Justificativa,
+  paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarData, validarPeriodo, validarVinculo, type AfastamentoLido, type Justificativa,
 } from "@/lib/ponto/escrita";
 import { somarDiasData } from "@/lib/vendas/datas";
 import { comCache, limparCachePorPrefixo } from "./cacheCurto";
@@ -97,6 +97,8 @@ async function justificar(db: SupabaseClient, quem: Quem, pedido: Extract<Pedido
   if (erroDia) throw new ErroEscrita(erroDia);
   const just = p.justificativas.find((j) => j.abreviada === pedido.justificativa);
   if (!just) throw new ErroEscrita("Escolha uma justificativa da lista do Secullum.");
+  const foraDoVinculo = validarVinculo(pedido.dia, p.f.admissao, p.f.demissao);
+  if (foraDoVinculo) throw new ErroEscrita(foraDoVinculo);
 
   const estado = await lerDia(p, pedido.dia);
   if (estado.batidas.length > 0) throw new ErroEscrita(`Este dia tem batida no Secullum (${estado.batidas.map((b) => b.hora).join(", ")}). Só dá para justificar dia sem batida.`);
@@ -186,6 +188,8 @@ async function afastamento(db: SupabaseClient, quem: Quem, pedido: Extract<Pedid
   const just = p.justificativas.find((j) => j.abreviada === pedido.justificativa);
   if (!just) throw new ErroEscrita("Escolha uma justificativa da lista do Secullum.");
   const motivo = (pedido.motivo ?? "").trim().slice(0, 100);
+  const foraDoVinculo = validarVinculo(pedido.inicio, p.f.admissao, p.f.demissao) ?? validarVinculo(pedido.fim, p.f.admissao, p.f.demissao);
+  if (foraDoVinculo) throw new ErroEscrita(foraDoVinculo);
   const existentes = (await lerAfastamentosDe(p, pedido.inicio, pedido.fim)).filter((a) => periodosSeSobrepoem(a, pedido));
   if (existentes.length > 0) throw new ErroEscrita(`Já existe afastamento neste período (${existentes.map((a) => `${dataBR(a.inicio)} a ${dataBR(a.fim)}`).join("; ")}). Apague-o antes.`);
   const previa: Previa = {

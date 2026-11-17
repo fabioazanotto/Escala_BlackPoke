@@ -48,8 +48,9 @@ function Chip({ s }: { s: Selo }) {
 }
 
 /** Ação de escrita possível num dia (só creator): justificar dia passado sem batida, ou remover justificativa do Secullum. */
-function acaoDoDia(d: DiaMes, hoje: string): "justificar" | "remover" | null {
+function acaoDoDia(d: DiaMes, hoje: string, admissao: string | null, demissao: string | null): "justificar" | "remover" | null {
   if (d.futuro || d.dia >= hoje || d.batidas.length > 0 || d.todasBatidas.length > 0) return null;
+  if ((admissao && d.dia < admissao) || (demissao && d.dia > demissao)) return null; // fora do vínculo: o Secullum recusaria
   return d.justificativa ? "remover" : "justificar";
 }
 
@@ -118,6 +119,7 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
   }, [funcionarioId, mes, carregar]);
 
   const selecionado = (lista ?? []).find((f) => f.id === funcionarioId) ?? null;
+  const vinculo = { admissao: dados?.funcionario.admissao ?? null, demissao: dados?.funcionario.demissao ?? null };
 
   function abrir(id: number) {
     setFuncionarioId(id);
@@ -315,9 +317,9 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
                         <td className="py-2 pr-3 tabular-nums">{d.trabalhadoMin > 0 ? duracao(d.trabalhadoMin) : "—"}</td>
                         <td className="py-2 pr-3">
                           <span className="inline-flex flex-wrap gap-1">{d.futuro ? "—" : selosDoDia(d).map((s) => <Chip key={s.texto} s={s} />)}</span>
-                          {creator && selecionado && acaoDoDia(d, hoje) && (
-                            <button type="button" className="mt-1 block rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50" onClick={() => setEscrita({ tipo: acaoDoDia(d, hoje) === "remover" ? "remover_justificativa" : "justificar", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia })}>
-                              {acaoDoDia(d, hoje) === "remover" ? "Remover justificativa" : "Justificar"}
+                          {creator && selecionado && acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) && (
+                            <button type="button" className="mt-1 block rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50" onClick={() => setEscrita({ tipo: acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) === "remover" ? "remover_justificativa" : "justificar", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia })}>
+                              {acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) === "remover" ? "Remover justificativa" : "Justificar"}
                             </button>
                           )}
                           {obs.map((t) => (
@@ -367,9 +369,9 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
                       <p className="text-xs text-neutral-600">{[d.escala, d.previsto].filter(Boolean).join(" · ") || "—"}</p>
                     </div>
                     {!d.futuro && <div className="mt-1 flex flex-wrap gap-1">{selosDoDia(d).map((s) => <Chip key={s.texto} s={s} />)}</div>}
-                    {creator && selecionado && acaoDoDia(d, hoje) && (
-                      <button type="button" className="mt-1.5 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800" onClick={() => setEscrita({ tipo: acaoDoDia(d, hoje) === "remover" ? "remover_justificativa" : "justificar", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia })}>
-                        {acaoDoDia(d, hoje) === "remover" ? "Remover justificativa" : "Justificar"}
+                    {creator && selecionado && acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) && (
+                      <button type="button" className="mt-1.5 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800" onClick={() => setEscrita({ tipo: acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) === "remover" ? "remover_justificativa" : "justificar", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia })}>
+                        {acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) === "remover" ? "Remover justificativa" : "Justificar"}
                       </button>
                     )}
                     {d.batidas.length > 0 && <p className="mt-1 text-xs tabular-nums text-neutral-700">{(d.retornoEmAberto ? posicionar(d.batidas, true) : d.batidas).map((b) => (b ? b.hora + (b.manual ? " (manual)" : "") : "—")).join(" · ")} {d.trabalhadoMin > 0 && `· ${duracao(d.trabalhadoMin)}`}</p>}

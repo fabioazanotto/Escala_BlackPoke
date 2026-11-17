@@ -29,6 +29,21 @@ describe("lista de operações de escrita", () => {
   });
 });
 
+describe("motivo do erro do Secullum", () => {
+  const erroCom = async (corpo: unknown, tipo: "json" | "texto" = "json") => {
+    const { fetchFn } = falso([{ status: 400, corpo: tipo === "json" ? corpo : undefined }]);
+    const f = tipo === "texto" ? (vi.fn(async (url: string | URL | Request) => (String(url).includes("/Token") ? new Response(JSON.stringify({ access_token: "t" }), { status: 200 }) : new Response(String(corpo), { status: 400 }))) as unknown as typeof fetch) : fetchFn;
+    const r = await new SessaoSecullumEscrita("1", { env, fetchFn: f }).escrever("POST", "CartaoPonto/Justificativa", { corpo: {} }).catch((e) => e as Error);
+    return (r as Error).message;
+  };
+  it("lê os formatos de corpo de erro conhecidos", async () => {
+    expect(await erroCom({ Message: "Data anterior à admissão" })).toContain("Data anterior à admissão");
+    expect(await erroCom({ errors: { Grupo: ["Grupo inválido"] } })).toContain("Grupo: Grupo inválido");
+    expect(await erroCom("Funcionário não encontrado", "texto")).toContain("Funcionário não encontrado");
+    expect(await erroCom([{ Property: "Data", Message: "inválida" }])).toContain("Data: inválida");
+  });
+});
+
 describe("SessaoSecullumEscrita", () => {
   it("usa a conta de ESCRITA (não a de leitura) e manda os cabeçalhos certos", async () => {
     const { fetchFn, chamadas } = falso([{ status: 200 }]);

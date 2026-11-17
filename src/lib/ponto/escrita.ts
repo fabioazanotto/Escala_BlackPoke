@@ -115,3 +115,11 @@ export function lerAfastamentos(brutos: unknown): AfastamentoLido[] {
 }
 
 export const periodosSeSobrepoem = (a: { inicio: string; fim: string }, b: { inicio: string; fim: string }) => a.inicio <= b.fim && b.inicio <= a.fim;
+
+/** O dia tem que estar dentro do vínculo: nem antes da admissão nem depois da demissão. */
+export function validarVinculo(dia: string, admissao: string | null, demissao: string | null): string | null {
+  const br = (d: string) => d.split("-").reverse().join("/");
+  if (admissao && dia < admissao) return `Este dia (${br(dia)}) é antes da admissão do funcionário (${br(admissao)}).`;
+  if (demissao && dia > demissao) return `Este dia (${br(dia)}) é depois da demissão do funcionário (${br(demissao)}).`;
+  return null;
+}

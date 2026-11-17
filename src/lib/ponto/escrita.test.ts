@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { corpoAfastamento, corpoApagarColuna, corpoJustificar, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas, paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarPeriodo } from "./escrita";
+import { corpoAfastamento, corpoApagarColuna, corpoJustificar, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas, paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarPeriodo, validarVinculo } from "./escrita";
 
 describe("liberadoParaEscrita (modo teste)", () => {
   it("só libera nome que começa com Teste", () => {
@@ -69,5 +69,14 @@ describe("justificativas e afastamentos lidos", () => {
     expect(l).toEqual([{ inicio: "2026-11-10", fim: "2026-11-12", justificativa: "ATEST", motivo: "x" }]);
     expect(periodosSeSobrepoem({ inicio: "2026-11-12", fim: "2026-11-14" }, l[0])).toBe(true);
     expect(periodosSeSobrepoem({ inicio: "2026-11-13", fim: "2026-11-14" }, l[0])).toBe(false);
+  });
+});
+
+describe("validarVinculo", () => {
+  it("recusa dia antes da admissão ou depois da demissão", () => {
+    expect(validarVinculo("2026-11-01", "2026-11-14", null)).toContain("antes da admissão (14/11/2026)");
+    expect(validarVinculo("2026-11-20", "2026-01-01", "2026-11-10")).toContain("depois da demissão");
+    expect(validarVinculo("2026-11-15", "2026-11-14", null)).toBeNull();
+    expect(validarVinculo("2026-11-15", null, null)).toBeNull();
   });
 });

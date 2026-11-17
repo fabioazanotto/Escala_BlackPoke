@@ -118,21 +118,35 @@ export function erroDoStatus(status: number, detalhe: string): ErroSecullum {
   return new ErroSecullum("ERRO_DO_SERVIDOR", `O Secullum respondeu com erro ${status}.`, status);
 }
 
-/** Mensagem do HTTP 400 do Secullum: lista de { Property, Message } (só os textos de validação, sem dados). */
-export async function detalheDoErro(resp: Response): Promise<string> {
-  try {
-    const corpo = (await resp.json()) as unknown;
-    if (Array.isArray(corpo)) {
-      return corpo
-        .map((e) => (e && typeof e === "object" ? `${String((e as Record<string, unknown>).Property ?? "")}: ${String((e as Record<string, unknown>).Message ?? "")}` : ""))
-        .filter(Boolean)
-        .join("; ")
-        .slice(0, 300);
-    }
-  } catch {
-    /* sem detalhe */
+/** Textos de validação de um corpo de erro do Secullum (formatos vistos: lista { Property, Message }, { Message }, { errors: { Campo: [msg] } }, texto puro). */
+export function mensagensDoCorpoDeErro(corpo: unknown): string[] {
+  if (typeof corpo === "string") return corpo.trim() ? [corpo.trim()] : [];
+  if (Array.isArray(corpo)) return corpo.flatMap((e) => (typeof e === "string" ? mensagensDoCorpoDeErro(e) : e && typeof e === "object" ? [[String((e as Record<string, unknown>).Property ?? ""), String((e as Record<string, unknown>).Message ?? (e as Record<string, unknown>).message ?? "")].filter(Boolean).join(": ")].filter(Boolean) : []));
+  if (corpo && typeof corpo === "object") {
+    const o = corpo as Record<string, unknown>;
+    const diretas = ["Message", "message", "Mensagem", "mensagem", "error", "Error", "title", "detail"].flatMap((k) => (typeof o[k] === "string" && o[k] ? [String(o[k])] : []));
+    const erros = o.errors && typeof o.errors === "object" ? Object.entries(o.errors as Record<string, unknown>).flatMap(([campo, v]) => (Array.isArray(v) ? v : [v]).map((m) => `${campo}: ${String(m)}`)) : [];
+    return [...diretas, ...erros];
   }
-  return "";
+  return [];
+}
+
+/** Motivo do HTTP 400 do Secullum (só o texto de validação, truncado; sem dados do funcionário). */
+export async function detalheDoErro(resp: Response): Promise<string> {
+  let texto = "";
+  try {
+    texto = await resp.text();
+  } catch {
+    return "";
+  }
+  if (!texto.trim()) return "";
+  try {
+    const partes = mensagensDoCorpoDeErro(JSON.parse(texto) as unknown);
+    if (partes.length > 0) return partes.join("; ").slice(0, 300);
+  } catch {
+    /* não é JSON: usa o texto puro abaixo */
+  }
+  return texto.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
 }
 
 // ---------------------------------------------------------------- autenticação

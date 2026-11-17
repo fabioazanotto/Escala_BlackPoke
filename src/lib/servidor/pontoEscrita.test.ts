@@ -10,6 +10,7 @@ const estado = vi.hoisted(() => ({
   batidasNoDia: [] as string[],
   afastamentos: [] as { Inicio: string; Fim: string; JustificativaNome: string; Motivo: string }[],
   nomeFuncionario: "Teste",
+  admissao: "2020-01-01T00:00:00" as string | null,
   auditoria: [] as Record<string, unknown>[],
 }));
 
@@ -33,7 +34,7 @@ vi.mock("./pontoDados", async (importar) => {
   const leitura = {
     obter: async (caminho: string) => {
       switch (caminho) {
-        case "Funcionarios": return [{ Id: 7, Nome: estado.nomeFuncionario, Cpf: "111.222.333-96", EmpresaId: 1, HorarioId: 5 }];
+        case "Funcionarios": return [{ Id: 7, Nome: estado.nomeFuncionario, Cpf: "111.222.333-96", EmpresaId: 1, HorarioId: 5, Admissao: estado.admissao }];
         case "Horarios": return [{ Id: 5, Dias: dia7 }];
         case "Justificativas": return [{ NomeAbreviado: "ATEST", NomeCompleto: "Atestado" }];
         case "Batidas": {
@@ -74,6 +75,7 @@ beforeEach(() => {
   estado.batidasNoDia = [];
   estado.afastamentos = [];
   estado.nomeFuncionario = "Teste";
+  estado.admissao = "2020-01-01T00:00:00";
   estado.auditoria = [];
   (globalThis as { __dia?: string }).__dia = passado;
 });
@@ -95,6 +97,12 @@ describe("modo teste e prévia", () => {
     await expect(processarEscrita(dbFalso(), quem, { acao: "justificar", funcionario: 7, dia: hoje, justificativa: "ATEST" })).rejects.toThrow(/já passou/);
     estado.batidasNoDia = ["16:00", "17:30"];
     await expect(processarEscrita(dbFalso(), quem, { acao: "justificar", funcionario: 7, dia: passado, justificativa: "ATEST" })).rejects.toThrow(/tem batida/);
+    expect(estado.escritas).toHaveLength(0);
+  });
+  it("recusa dia antes da admissão (o Secullum recusaria) sem escrever nada", async () => {
+    estado.admissao = `${somarDiasData(hoje, -1)}T00:00:00`;
+    await expect(processarEscrita(dbFalso(), quem, { acao: "justificar", funcionario: 7, dia: passado, justificativa: "ATEST", confirmar: true })).rejects.toThrow(/antes da admissão/);
+    await expect(processarEscrita(dbFalso(), quem, { acao: "afastamento", funcionario: 7, inicio: passado, fim: hoje, justificativa: "ATEST", confirmar: true })).rejects.toThrow(/antes da admissão/);
     expect(estado.escritas).toHaveLength(0);
   });
   it("recusa justificativa que não existe na lista do Secullum", async () => {
