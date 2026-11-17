@@ -6,6 +6,7 @@ import { LOJAS_XMENU } from "@/config/lojas";
 import { ErroSecullum, valorDoCampo } from "@/lib/integracoes/secullum";
 import { agoraNoBrasil, diaDeTrabalho, jornadaDe, type Jornada } from "@/lib/ponto/aoVivo";
 import { montarCabecalho, type CabecalhoCartao } from "@/lib/ponto/cartao";
+import { afastamentosDoFuncionario } from "@/lib/ponto/escrita";
 import { mascararCpf } from "@/lib/ponto/conferencia";
 import { montarMes, parseCalcular, pontosDeAtencao, ultimoDiaDoMes, type DiaEscala, type InfoDiaSecullum } from "@/lib/ponto/mes";
 import { somarDiasData } from "@/lib/vendas/datas";
@@ -82,7 +83,7 @@ export async function montarMesDoColaborador(db: SupabaseClient, funcionarioId: 
     }
     agrupadas.set(d, info);
   }
-  for (const a of lista(dados.afastamentos)) {
+  for (const a of afastamentosDoFuncionario(dados.afastamentos, cpf, false)) {
     const ini = texto(valorDoCampo(a, "Inicio")).slice(0, 10);
     const fim = texto(valorDoCampo(a, "Fim")).slice(0, 10);
     const nome = texto(valorDoCampo(a, "JustificativaNome")) || "Afastamento";

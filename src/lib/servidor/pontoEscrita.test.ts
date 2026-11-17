@@ -8,7 +8,7 @@ const estado = vi.hoisted(() => ({
   falharNaEscrita: null as number | null, // número (1-based) da escrita que falha
   justificativasNoDia: [] as { grupo: number; texto: string }[], // o que o "Secullum" tem no dia
   batidasNoDia: [] as string[],
-  afastamentos: [] as { Inicio: string; Fim: string; JustificativaNome: string; Motivo: string }[],
+  afastamentos: [] as { Cpf?: string; Inicio: string; Fim: string; JustificativaNome: string; Motivo: string }[],
   nomeFuncionario: "Teste",
   admissao: "2020-01-01T00:00:00" as string | null,
   auditoria: [] as Record<string, unknown>[],
@@ -21,8 +21,8 @@ vi.mock("@/lib/integracoes/secullumEscrita", () => ({
       if (estado.falharNaEscrita !== null && estado.escritas.length === estado.falharNaEscrita) throw new Error("O Secullum não aceitou o pedido: Grupo: erro simulado");
       if (caminho === "CartaoPonto/Justificativa") estado.justificativasNoDia.push({ grupo: Number(opcoes.corpo!.Grupo), texto: String(opcoes.corpo!.Justificativa) });
       if (metodo === "DELETE" && caminho === "CartaoPonto") estado.justificativasNoDia = estado.justificativasNoDia.filter((j) => `Entrada${j.grupo}` !== opcoes.corpo!.Coluna && `Saida${j.grupo}` !== opcoes.corpo!.Coluna);
-      if (caminho === "FuncionariosAfastamentos") estado.afastamentos.push({ Inicio: String(opcoes.corpo!.Inicio), Fim: String(opcoes.corpo!.Fim), JustificativaNome: String(opcoes.corpo!.JustificativaNome), Motivo: String(opcoes.corpo!.Motivo ?? "") });
-      if (caminho === "FuncionariosAfastamentos/Cpf") estado.afastamentos = estado.afastamentos.filter((a) => !(a.Inicio === opcoes.params!.dataInicio && a.Fim === opcoes.params!.dataFim));
+      if (caminho === "FuncionariosAfastamentos") estado.afastamentos.push({ Cpf: "111.222.333-96", Inicio: String(opcoes.corpo!.Inicio), Fim: String(opcoes.corpo!.Fim), JustificativaNome: String(opcoes.corpo!.JustificativaNome), Motivo: String(opcoes.corpo!.Motivo ?? "") });
+      if (caminho === "FuncionariosAfastamentos/Cpf") estado.afastamentos = estado.afastamentos.filter((a) => !(a.Cpf === "111.222.333-96" && a.Inicio === opcoes.params!.dataInicio && a.Fim === opcoes.params!.dataFim));
       return { status: 200, corpo: null };
     }
   },
@@ -155,10 +155,36 @@ describe("afastamento", () => {
     expect(estado.escritas[1]).toMatchObject({ metodo: "DELETE", caminho: "FuncionariosAfastamentos/Cpf", params: { dataInicio: ini, dataFim: fim } });
   });
   it("recusa período que se sobrepõe a outro e período trocado; só apaga com datas exatas", async () => {
-    estado.afastamentos = [{ Inicio: ini, Fim: fim, JustificativaNome: "ATEST", Motivo: "" }];
+    estado.afastamentos = [{ Cpf: "111.222.333-96", Inicio: ini, Fim: fim, JustificativaNome: "ATEST", Motivo: "" }];
     await expect(processarEscrita(dbFalso(), quem, { acao: "afastamento", funcionario: 7, inicio: ini, fim: ini, justificativa: "ATEST", confirmar: true })).rejects.toThrow(/Já existe afastamento/);
     await expect(processarEscrita(dbFalso(), quem, { acao: "afastamento", funcionario: 7, inicio: fim, fim: ini, justificativa: "ATEST", confirmar: true })).rejects.toThrow(/antes da inicial/);
     await expect(processarEscrita(dbFalso(), quem, { acao: "remover_afastamento", funcionario: 7, inicio: ini, fim: ini, confirmar: true })).rejects.toThrow(/Não achei/);
     expect(estado.escritas).toHaveLength(0);
+  });
+});
+
+describe("afastamentos de outras pessoas (o Secullum já devolveu os de todo mundo ao filtrar por CPF)", () => {
+  const ini = somarDiasData(hoje, 2);
+  const fim = somarDiasData(hoje, 3);
+  it("a lista mostra só os do funcionário", async () => {
+    estado.afastamentos = [
+      { Cpf: "999.888.777-66", Inicio: "2026-08-31", Fim: "2026-09-14", JustificativaNome: "FERIAS", Motivo: "Férias" },
+      { Cpf: "111.222.333-96", Inicio: ini, Fim: fim, JustificativaNome: "ATEST", Motivo: "" },
+    ];
+    const r = await processarEscrita(dbFalso(), quem, { acao: "listar_afastamentos", funcionario: 7 });
+    expect(r.afastamentos).toEqual([{ inicio: ini, fim, justificativa: "ATEST", motivo: "" }]);
+  });
+  it("não apaga por datas se outra pessoa tem as mesmas datas", async () => {
+    estado.afastamentos = [
+      { Cpf: "999.888.777-66", Inicio: ini, Fim: fim, JustificativaNome: "FERIAS", Motivo: "" },
+      { Cpf: "111.222.333-96", Inicio: ini, Fim: fim, JustificativaNome: "ATEST", Motivo: "" },
+    ];
+    await expect(processarEscrita(dbFalso(), quem, { acao: "remover_afastamento", funcionario: 7, inicio: ini, fim, confirmar: true })).rejects.toThrow(/Outro funcionário/);
+    expect(estado.escritas).toHaveLength(0);
+  });
+  it("registros sem CPF não são aceitos na escrita (não dá para saber de quem são)", async () => {
+    estado.afastamentos = [{ Inicio: ini, Fim: fim, JustificativaNome: "ATEST", Motivo: "" }];
+    const r = await processarEscrita(dbFalso(), quem, { acao: "listar_afastamentos", funcionario: 7 });
+    expect(r.afastamentos).toEqual([]);
   });
 });

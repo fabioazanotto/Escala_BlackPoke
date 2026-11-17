@@ -8,7 +8,7 @@ import { ErroSecullum, valorDoCampo } from "@/lib/integracoes/secullum";
 import { SessaoSecullumEscrita } from "@/lib/integracoes/secullumEscrita";
 import { agoraNoBrasil, diaDeTrabalho } from "@/lib/ponto/aoVivo";
 import {
-  corpoAfastamento, corpoApagarColuna, corpoJustificar, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
+  afastamentosDeOutrosComAsMesmasDatas, corpoAfastamento, corpoApagarColuna, corpoJustificar, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
   paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarData, validarPeriodo, validarVinculo, type AfastamentoLido, type Justificativa,
 } from "@/lib/ponto/escrita";
 import { somarDiasData } from "@/lib/vendas/datas";
@@ -68,8 +68,13 @@ async function lerDia(p: Preparado, dia: string) {
   return estadoDoDia(linha);
 }
 
+async function lerAfastamentosBrutos(p: Preparado, de: string, ate: string) {
+  return p.contexto.sessao.obter("FuncionariosAfastamentos", { dataInicio: de, dataFim: ate, funcionarioCpf: p.cpf });
+}
+
+/** Só os afastamentos DESTE funcionário (o Secullum já devolveu os de outras pessoas ao filtrar por CPF). */
 async function lerAfastamentosDe(p: Preparado, de: string, ate: string) {
-  return lerAfastamentos(await p.contexto.sessao.obter("FuncionariosAfastamentos", { dataInicio: de, dataFim: ate, funcionarioCpf: p.cpf }));
+  return lerAfastamentos(await lerAfastamentosBrutos(p, de, ate), p.cpf);
 }
 
 function invalidar(p: Preparado) {
@@ -218,7 +223,9 @@ async function removerAfastamento(db: SupabaseClient, quem: Quem, pedido: Extrac
   const p = await preparar(db, pedido.funcionario);
   const erroPeriodo = validarPeriodo(pedido.inicio, pedido.fim, p.hoje);
   if (erroPeriodo) throw new ErroEscrita(erroPeriodo);
-  const iguais = (await lerAfastamentosDe(p, pedido.inicio, pedido.fim)).filter((a) => a.inicio === pedido.inicio && a.fim === pedido.fim);
+  const brutos = await lerAfastamentosBrutos(p, pedido.inicio, pedido.fim);
+  const iguais = lerAfastamentos(brutos, p.cpf).filter((a) => a.inicio === pedido.inicio && a.fim === pedido.fim);
+  if (afastamentosDeOutrosComAsMesmasDatas(brutos, p.cpf, pedido.inicio, pedido.fim) > 0) throw new ErroEscrita("Outro funcionário tem afastamento com exatamente essas datas: apagar por aqui poderia atingir o errado. Apague pelo Secullum.");
   if (iguais.length !== 1) throw new ErroEscrita(iguais.length === 0 ? "Não achei esse afastamento no Secullum (início e fim exatos)." : "Há mais de um afastamento com essas datas: apague pelo Secullum para não remover o errado.");
   const previa: Previa = {
     titulo: "Apagar afastamento no Secullum",

@@ -106,12 +106,32 @@ export const paramsApagarAfastamento = (cpf: string, inicio: string, fim: string
 
 export type AfastamentoLido = { inicio: string; fim: string; justificativa: string; motivo: string };
 
-export function lerAfastamentos(brutos: unknown): AfastamentoLido[] {
-  if (!Array.isArray(brutos)) return [];
-  return brutos
+const CAMPOS_CPF = ["Cpf", "FuncionarioCpf", "CpfFuncionario"];
+const cpfDe = (a: unknown) => (CAMPOS_CPF.map((c) => texto(valorDoCampo(a, c))).find((v) => v !== "") ?? "").replace(/\D/g, "");
+
+/**
+ * Afastamentos de UM funcionário. O Secullum nem sempre respeita o filtro por CPF (já devolveu afastamentos de outras pessoas),
+ * então conferimos o CPF de cada registro. Se NENHUM registro traz CPF não há como saber de quem são: no modo estrito (escrita)
+ * nada é aceito; no modo leitura (tela do mês) vale o filtro do servidor.
+ */
+export function afastamentosDoFuncionario(brutos: unknown, cpf: string, estrito = true): unknown[] {
+  const lista = Array.isArray(brutos) ? brutos : [];
+  if (!lista.some((a) => cpfDe(a) !== "")) return estrito ? [] : lista;
+  return lista.filter((a) => cpfDe(a) === cpf);
+}
+
+export function lerAfastamentos(brutos: unknown, cpf?: string): AfastamentoLido[] {
+  const lista = cpf ? afastamentosDoFuncionario(brutos, cpf) : Array.isArray(brutos) ? brutos : [];
+  return lista
     .map((a) => ({ inicio: texto(valorDoCampo(a, "Inicio")).slice(0, 10), fim: texto(valorDoCampo(a, "Fim")).slice(0, 10), justificativa: texto(valorDoCampo(a, "JustificativaNome")), motivo: texto(valorDoCampo(a, "Motivo")) }))
     .filter((a) => DATA.test(a.inicio) && DATA.test(a.fim))
     .sort((a, b) => b.inicio.localeCompare(a.inicio));
+}
+
+/** Afastamentos de OUTRAS pessoas com exatamente as mesmas datas (apagar por datas poderia atingir o errado). */
+export function afastamentosDeOutrosComAsMesmasDatas(brutos: unknown, cpf: string, inicio: string, fim: string): number {
+  const lista = Array.isArray(brutos) ? brutos : [];
+  return lista.filter((a) => cpfDe(a) !== cpf && texto(valorDoCampo(a, "Inicio")).slice(0, 10) === inicio && texto(valorDoCampo(a, "Fim")).slice(0, 10) === fim).length;
 }
 
 export const periodosSeSobrepoem = (a: { inicio: string; fim: string }, b: { inicio: string; fim: string }) => a.inicio <= b.fim && b.inicio <= a.fim;
