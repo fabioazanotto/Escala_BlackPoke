@@ -143,3 +143,20 @@ export function validarVinculo(dia: string, admissao: string | null, demissao: s
   if (demissao && dia > demissao) return `Este dia (${br(dia)}) é depois da demissão do funcionário (${br(demissao)}).`;
   return null;
 }
+
+// ---------------------------------------------------------------- diagnóstico da conta de escrita (só leitura)
+
+export type Visibilidade = { empresasVisiveis: string[]; empresasDoProjetoQueNaoEnxerga: string[]; funcionarios: number; testeVisivel: boolean };
+
+/** O que a conta de escrita enxerga: compara as empresas do projeto com as empresas e funcionários que ela lê. */
+export function analisarVisibilidade(empresasDoProjeto: { empresaId: number; nome: string }[], empresasApi: unknown, funcionariosApi: unknown, palavraTeste = PALAVRA_DO_FUNCIONARIO_TESTE): Visibilidade {
+  const empresas = Array.isArray(empresasApi) ? empresasApi : [];
+  const ids = new Set(empresas.map((e) => Number(valorDoCampo(e, "Id"))));
+  const funcs = Array.isArray(funcionariosApi) ? funcionariosApi : [];
+  return {
+    empresasVisiveis: empresas.map((e) => texto(valorDoCampo(e, "Nome"))).filter(Boolean),
+    empresasDoProjetoQueNaoEnxerga: empresasDoProjeto.filter((e) => !ids.has(e.empresaId)).map((e) => e.nome),
+    funcionarios: funcs.length,
+    testeVisivel: funcs.some((f) => semAcento(texto(valorDoCampo(f, "Nome"))).split(/\s+/)[0] === palavraTeste),
+  };
+}

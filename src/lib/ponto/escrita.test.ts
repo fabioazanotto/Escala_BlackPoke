@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { corpoAfastamento, corpoApagarColuna, corpoJustificar, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas, paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarPeriodo, validarVinculo } from "./escrita";
+import { analisarVisibilidade, corpoAfastamento, corpoApagarColuna, corpoJustificar, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas, paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarPeriodo, validarVinculo } from "./escrita";
 
 describe("liberadoParaEscrita (modo teste)", () => {
   it("só libera nome que começa com Teste", () => {
@@ -78,5 +78,19 @@ describe("validarVinculo", () => {
     expect(validarVinculo("2026-11-20", "2026-01-01", "2026-11-10")).toContain("depois da demissão");
     expect(validarVinculo("2026-11-15", "2026-11-14", null)).toBeNull();
     expect(validarVinculo("2026-11-15", null, null)).toBeNull();
+  });
+});
+
+describe("analisarVisibilidade", () => {
+  const projeto = [{ empresaId: 1, nome: "EMP SANTOS" }, { empresaId: 2, nome: "EMP ABC" }];
+  it("aponta empresa do projeto que a conta não enxerga e se o funcionário de teste aparece", () => {
+    const v = analisarVisibilidade(projeto, [{ Id: 1, Nome: "EMP SANTOS" }], [{ Nome: "Maria Silva" }]);
+    expect(v).toEqual({ empresasVisiveis: ["EMP SANTOS"], empresasDoProjetoQueNaoEnxerga: ["EMP ABC"], funcionarios: 1, testeVisivel: false });
+  });
+  it("conta que enxerga tudo", () => {
+    const v = analisarVisibilidade(projeto, [{ Id: 1, Nome: "A" }, { Id: 2, Nome: "B" }], [{ Nome: "teste" }, { Nome: "Ana" }]);
+    expect(v.empresasDoProjetoQueNaoEnxerga).toEqual([]);
+    expect(v.testeVisivel).toBe(true);
+    expect(v.funcionarios).toBe(2);
   });
 });

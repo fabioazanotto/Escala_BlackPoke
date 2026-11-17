@@ -4,11 +4,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MODO_TESTE_ESCRITA } from "@/config/escrita";
-import { ErroSecullum, valorDoCampo } from "@/lib/integracoes/secullum";
-import { SessaoSecullumEscrita } from "@/lib/integracoes/secullumEscrita";
+import { ErroSecullum, SessaoSecullum, URL_AUTENTICADOR, obterToken, valorDoCampo } from "@/lib/integracoes/secullum";
+import { SessaoSecullumEscrita, credenciaisDeEscrita } from "@/lib/integracoes/secullumEscrita";
 import { agoraNoBrasil, diaDeTrabalho } from "@/lib/ponto/aoVivo";
 import {
-  afastamentosDeOutrosComAsMesmasDatas, corpoAfastamento, corpoApagarColuna, corpoJustificar, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
+  afastamentosDeOutrosComAsMesmasDatas, analisarVisibilidade, corpoAfastamento, corpoApagarColuna, corpoJustificar, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
   paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarData, validarPeriodo, validarVinculo, type AfastamentoLido, type Justificativa,
 } from "@/lib/ponto/escrita";
 import { somarDiasData } from "@/lib/vendas/datas";
@@ -19,6 +19,7 @@ export class ErroEscrita extends Error {}
 
 export type Pedido =
   | { acao: "opcoes" }
+  | { acao: "diagnostico_escrita" }
   | { acao: "listar_afastamentos"; funcionario: number }
   | { acao: "justificar"; funcionario: number; dia: string; justificativa: string; confirmar?: boolean }
   | { acao: "remover_justificativa"; funcionario: number; dia: string; confirmar?: boolean }
@@ -27,7 +28,8 @@ export type Pedido =
 
 export type Previa = { titulo: string; linhas: string[]; avisos: string[] };
 export type ResultadoEscrita = { ok: boolean; mensagem: string; avisos: string[] };
-export type RespostaEscrita = { modoTeste: boolean; justificativas?: Justificativa[]; afastamentos?: AfastamentoLido[]; previa?: Previa; resultado?: ResultadoEscrita };
+export type DiagnosticoEscrita = { conta: { nome: string; email: string } | null; empresasVisiveis: string[]; empresasDoProjetoQueNaoEnxerga: string[]; funcionarios: number; testeVisivel: boolean; justificativas: number };
+export type RespostaEscrita = { modoTeste: boolean; diagnostico?: DiagnosticoEscrita; justificativas?: Justificativa[]; afastamentos?: AfastamentoLido[]; previa?: Previa; resultado?: ResultadoEscrita };
 
 const lista = (x: unknown) => (Array.isArray(x) ? x : []);
 const texto = (x: unknown) => (typeof x === "string" ? x : "");
@@ -249,6 +251,33 @@ async function removerAfastamento(db: SupabaseClient, quem: Quem, pedido: Extrac
   return { modoTeste: MODO_TESTE_ESCRITA, resultado: { ok: true, mensagem, avisos: [] } };
 }
 
+// ---------------------------------------------------------------- diagnóstico (só lê, com a conta de escrita)
+
+/** Mostra quem é a conta de escrita para o Secullum e o que ela enxerga. NÃO grava nada. */
+async function diagnostico(db: SupabaseClient): Promise<RespostaEscrita> {
+  const { usuario, senha } = credenciaisDeEscrita();
+  const dep = { env: { SECULLUM_USUARIO: usuario, SECULLUM_SENHA: senha } };
+  const { data: bancos } = await db.from("ponto_bancos").select("secullum_id").eq("ativo", true);
+  if (!bancos || bancos.length !== 1) throw new ErroEscrita("Configure exatamente um banco ativo do Secullum (tabela ponto_bancos).");
+  const { contexto } = await comCache("contexto", 10 * 60000, () => carregarContexto(db));
+
+  const token = await obterToken(dep);
+  let conta: DiagnosticoEscrita["conta"] = null;
+  try {
+    const r = await fetch(`${URL_AUTENTICADOR}/ReinvidicacoesToken`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body: new URLSearchParams({ token }).toString(), cache: "no-store" });
+    if (r.ok) {
+      const j = (await r.json()) as Record<string, unknown>;
+      conta = { nome: texto(valorDoCampo(j, "nome")), email: texto(valorDoCampo(j, "email")) };
+    }
+  } catch {
+    /* sem identificação: o resto do diagnóstico segue */
+  }
+  const leitura = new SessaoSecullum(String(bancos[0].secullum_id), dep);
+  const [empresas, funcionarios, justificativas] = await Promise.all([leitura.obter("Empresas"), leitura.obter("Funcionarios"), leitura.obter("Justificativas")]);
+  const v = analisarVisibilidade(contexto.empresas, empresas, funcionarios);
+  return { modoTeste: MODO_TESTE_ESCRITA, diagnostico: { conta, ...v, justificativas: lista(justificativas).length } };
+}
+
 // ---------------------------------------------------------------- entrada
 
 export async function processarEscrita(db: SupabaseClient, quem: Quem, pedido: Pedido): Promise<RespostaEscrita> {
@@ -258,6 +287,8 @@ export async function processarEscrita(db: SupabaseClient, quem: Quem, pedido: P
       const justificativas = listarJustificativas(await comCache("justificativas", TTL_CADASTROS_MS, () => contexto.sessao.obter("Justificativas")));
       return { modoTeste: MODO_TESTE_ESCRITA, justificativas };
     }
+    case "diagnostico_escrita":
+      return diagnostico(db);
     case "listar_afastamentos": {
       const p = await preparar(db, pedido.funcionario);
       return { modoTeste: MODO_TESTE_ESCRITA, afastamentos: await lerAfastamentosDe(p, somarDiasData(p.hoje, -365), somarDiasData(p.hoje, 365)) };

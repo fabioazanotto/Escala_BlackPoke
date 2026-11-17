@@ -3,13 +3,14 @@
 import { CabecalhoPagina } from "@/components/CabecalhoPagina";
 import { useSessao } from "@/components/Sessao";
 import { AtualizarNomes } from "@/components/ponto/AtualizarNomes";
+import { ConexaoEscrita } from "@/components/ponto/ConexaoEscrita";
 import { ConexaoSecullum } from "@/components/ponto/ConexaoSecullum";
 import { ConferenciaFuncionarios } from "@/components/ponto/ConferenciaFuncionarios";
 import { SincronizacaoPonto } from "@/components/ponto/SincronizacaoPonto";
 import { ehAdmin } from "@/lib/acesso";
 
 export default function IntegracaoDoPonto() {
-  const { perfil } = useSessao();
+  const { perfil, creator } = useSessao();
   return (
     <div>
       <CabecalhoPagina titulo="Integração do ponto" descricao="Sincronização das batidas, conferência de funcionários e conexão com o Secullum." />
@@ -23,6 +24,7 @@ export default function IntegracaoDoPonto() {
           <ConferenciaFuncionarios />
           <AtualizarNomes />
           <ConexaoSecullum />
+          {creator && <ConexaoEscrita />}
         </div>
       )}
     </div>
