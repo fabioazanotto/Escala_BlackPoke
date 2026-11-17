@@ -74,7 +74,7 @@ describe("justificativas e afastamentos lidos", () => {
 
 describe("validarVinculo", () => {
   it("recusa dia antes da admissão ou depois da demissão", () => {
-    expect(validarVinculo("2026-11-01", "2026-11-14", null)).toContain("antes da admissão (14/11/2026)");
+    expect(validarVinculo("2026-11-01", "2026-11-14", null)).toContain("antes da admissão do funcionário (14/11/2026)");
     expect(validarVinculo("2026-11-20", "2026-01-01", "2026-11-10")).toContain("depois da demissão");
     expect(validarVinculo("2026-11-15", "2026-11-14", null)).toBeNull();
     expect(validarVinculo("2026-11-15", null, null)).toBeNull();
