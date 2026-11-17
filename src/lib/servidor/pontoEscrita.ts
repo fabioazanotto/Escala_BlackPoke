@@ -8,7 +8,7 @@ import { ErroSecullum, SessaoSecullum, URL_AUTENTICADOR, obterToken, valorDoCamp
 import { SessaoSecullumEscrita, credenciaisDeEscrita } from "@/lib/integracoes/secullumEscrita";
 import { agoraNoBrasil, diaDeTrabalho } from "@/lib/ponto/aoVivo";
 import {
-  afastamentosDeOutrosComAsMesmasDatas, analisarVisibilidade, corpoAfastamento, corpoApagarColuna, corpoJustificar, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
+  afastamentosDeOutrosComAsMesmasDatas, analisarVisibilidade, corpoAfastamento, corpoApagarColuna, corpoJustificar, formatosDataInclusao, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
   paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarData, validarPeriodo, validarVinculo, type AfastamentoLido, type Justificativa,
 } from "@/lib/ponto/escrita";
 import { somarDiasData } from "@/lib/vendas/datas";
@@ -206,10 +206,19 @@ async function afastamento(db: SupabaseClient, quem: Quem, pedido: Extract<Pedid
   };
   if (!pedido.confirmar) return { modoTeste: MODO_TESTE_ESCRITA, previa };
 
-  try {
-    await p.escrita.escrever("POST", "FuncionariosAfastamentos", { corpo: corpoAfastamento(p.cpfSecullum, pedido.inicio, pedido.fim, just.abreviada, motivo) });
-  } catch (e) {
-    const msg = mensagemDe(e);
+  let falha: unknown = null;
+  for (const dataInclusao of formatosDataInclusao(agoraNoBrasil())) {
+    try {
+      await p.escrita.escrever("POST", "FuncionariosAfastamentos", { corpo: corpoAfastamento(p.cpfSecullum, pedido.inicio, pedido.fim, just.abreviada, motivo, dataInclusao) });
+      falha = null;
+      break;
+    } catch (e) {
+      falha = e;
+      if (!/DataInclusao/i.test(mensagemDe(e))) break; // só tenta outro formato se o Secullum reclamou desse campo
+    }
+  }
+  if (falha) {
+    const msg = mensagemDe(falha);
     await registrar(db, quem, p, "afastamento", pedido.inicio, pedido.fim, { justificativa: just.abreviada }, "erro", msg);
     throw new ErroEscrita(msg);
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analisarVisibilidade, corpoAfastamento, corpoApagarColuna, corpoJustificar, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas, paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarPeriodo, validarVinculo } from "./escrita";
+import { analisarVisibilidade, corpoAfastamento, formatosDataInclusao, corpoApagarColuna, corpoJustificar, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas, paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarPeriodo, validarVinculo } from "./escrita";
 
 describe("liberadoParaEscrita (modo teste)", () => {
   it("só libera nome que começa com Teste", () => {
@@ -53,8 +53,8 @@ describe("corpos enviados ao Secullum", () => {
   it("monta exatamente os campos do manual", () => {
     expect(corpoJustificar("111", "2026-11-10", 2, "ATEST")).toEqual({ Cpf: "111", Data: "2026-11-10", Grupo: 2, Justificativa: "ATEST" });
     expect(corpoApagarColuna("111", "2026-11-10", "Entrada2", "x".repeat(200)).Motivo).toHaveLength(150);
-    expect(corpoAfastamento("111", "2026-11-10", "2026-11-12", "ATEST", "")).toEqual({ Cpf: "111", Inicio: "2026-11-10", Fim: "2026-11-12", JustificativaNome: "ATEST" });
-    expect(corpoAfastamento("111", "2026-11-10", "2026-11-12", "ATEST", "Consulta").Motivo).toBe("Consulta");
+    expect(corpoAfastamento("111", "2026-11-10", "2026-11-12", "ATEST", "", "2026-11-17T14:05:00")).toEqual({ Cpf: "111", Inicio: "2026-11-10", Fim: "2026-11-12", JustificativaNome: "ATEST", DataInclusao: "2026-11-17T14:05:00" });
+    expect(corpoAfastamento("111", "2026-11-10", "2026-11-12", "ATEST", "Consulta", "x").Motivo).toBe("Consulta");
     expect(paramsApagarAfastamento("111", "2026-11-10", "2026-11-12")).toEqual({ dataInicio: "2026-11-10", dataFim: "2026-11-12", funcionarioCpf: "111" });
   });
 });
@@ -92,5 +92,12 @@ describe("analisarVisibilidade", () => {
     expect(v.empresasDoProjetoQueNaoEnxerga).toEqual([]);
     expect(v.testeVisivel).toBe(true);
     expect(v.funcionarios).toBe(2);
+  });
+});
+
+describe("formatosDataInclusao", () => {
+  it("tenta data e hora e depois só a data", () => {
+    expect(formatosDataInclusao({ data: "2026-11-17", minutos: 14 * 60 + 5 })).toEqual(["2026-11-17T14:05:00", "2026-11-17"]);
+    expect(formatosDataInclusao({ data: "2026-11-17", minutos: 9 })).toEqual(["2026-11-17T00:09:00", "2026-11-17"]);
   });
 });

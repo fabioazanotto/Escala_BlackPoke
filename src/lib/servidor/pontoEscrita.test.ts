@@ -6,6 +6,7 @@ import { somarDiasData } from "@/lib/vendas/datas";
 const estado = vi.hoisted(() => ({
   escritas: [] as { metodo: string; caminho: string; corpo?: Record<string, unknown>; params?: Record<string, unknown> }[],
   falharNaEscrita: null as number | null, // número (1-based) da escrita que falha
+  dataInclusaoSoData: false, // simula o Secullum que só aceita DataInclusao sem hora
   justificativasNoDia: [] as { grupo: number; texto: string }[], // o que o "Secullum" tem no dia
   batidasNoDia: [] as string[],
   afastamentos: [] as { Cpf?: string; Inicio: string; Fim: string; JustificativaNome: string; Motivo: string }[],
@@ -19,6 +20,7 @@ vi.mock("@/lib/integracoes/secullumEscrita", () => ({
     async escrever(metodo: string, caminho: string, opcoes: { corpo?: Record<string, unknown>; params?: Record<string, unknown> } = {}) {
       estado.escritas.push({ metodo, caminho, ...opcoes });
       if (estado.falharNaEscrita !== null && estado.escritas.length === estado.falharNaEscrita) throw new Error("O Secullum não aceitou o pedido: Grupo: erro simulado");
+      if (caminho === "FuncionariosAfastamentos" && estado.dataInclusaoSoData && String(opcoes.corpo!.DataInclusao).includes("T")) throw new Error("O Secullum não aceitou o pedido: DataInclusao: Preencha o campo DataInclusao corretamente.");
       if (caminho === "CartaoPonto/Justificativa") estado.justificativasNoDia.push({ grupo: Number(opcoes.corpo!.Grupo), texto: String(opcoes.corpo!.Justificativa) });
       if (metodo === "DELETE" && caminho === "CartaoPonto") estado.justificativasNoDia = estado.justificativasNoDia.filter((j) => `Entrada${j.grupo}` !== opcoes.corpo!.Coluna && `Saida${j.grupo}` !== opcoes.corpo!.Coluna);
       if (caminho === "FuncionariosAfastamentos") estado.afastamentos.push({ Cpf: "111.222.333-96", Inicio: String(opcoes.corpo!.Inicio), Fim: String(opcoes.corpo!.Fim), JustificativaNome: String(opcoes.corpo!.JustificativaNome), Motivo: String(opcoes.corpo!.Motivo ?? "") });
@@ -71,6 +73,7 @@ beforeEach(() => {
   reiniciarCache();
   estado.escritas = [];
   estado.falharNaEscrita = null;
+  estado.dataInclusaoSoData = false;
   estado.justificativasNoDia = [];
   estado.batidasNoDia = [];
   estado.afastamentos = [];
@@ -186,5 +189,21 @@ describe("afastamentos de outras pessoas (o Secullum já devolveu os de todo mun
     estado.afastamentos = [{ Inicio: ini, Fim: fim, JustificativaNome: "ATEST", Motivo: "" }];
     const r = await processarEscrita(dbFalso(), quem, { acao: "listar_afastamentos", funcionario: 7 });
     expect(r.afastamentos).toEqual([]);
+  });
+});
+
+describe("DataInclusao do afastamento", () => {
+  const ini = somarDiasData(hoje, 2);
+  const fim = somarDiasData(hoje, 3);
+  it("manda DataInclusao com data e hora", async () => {
+    await processarEscrita(dbFalso(), quem, { acao: "afastamento", funcionario: 7, inicio: ini, fim, justificativa: "ATEST", confirmar: true });
+    expect(String(estado.escritas[0].corpo!.DataInclusao)).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00$/);
+  });
+  it("se o Secullum reclamar do campo, tenta só a data e grava", async () => {
+    estado.dataInclusaoSoData = true;
+    const r = await processarEscrita(dbFalso(), quem, { acao: "afastamento", funcionario: 7, inicio: ini, fim, justificativa: "ATEST", confirmar: true });
+    expect(estado.escritas).toHaveLength(2);
+    expect(String(estado.escritas[1].corpo!.DataInclusao)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(r.resultado?.ok).toBe(true);
   });
 });

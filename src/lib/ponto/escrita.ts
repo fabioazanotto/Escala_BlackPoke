@@ -99,7 +99,17 @@ export function listarJustificativas(brutas: unknown): Justificativa[] {
 
 export const corpoJustificar = (cpf: string, dia: string, grupo: number, abreviada: string) => ({ Cpf: cpf, Data: dia, Grupo: grupo, Justificativa: abreviada });
 export const corpoApagarColuna = (cpf: string, dia: string, coluna: string, motivo: string) => ({ Cpf: cpf, Data: dia, Coluna: coluna, Motivo: motivo.slice(0, 150) });
-export const corpoAfastamento = (cpf: string, inicio: string, fim: string, abreviada: string, motivo: string) => ({ Cpf: cpf, Inicio: inicio, Fim: fim, JustificativaNome: abreviada, ...(motivo ? { Motivo: motivo.slice(0, 100) } : {}) });
+export const corpoAfastamento = (cpf: string, inicio: string, fim: string, abreviada: string, motivo: string, dataInclusao: string) => ({ Cpf: cpf, Inicio: inicio, Fim: fim, JustificativaNome: abreviada, DataInclusao: dataInclusao, ...(motivo ? { Motivo: motivo.slice(0, 100) } : {}) });
+
+/**
+ * O Secullum exige o campo DataInclusao no afastamento (não está na tabela do manual) e não diz o formato.
+ * Tenta data e hora (AAAA-MM-DDTHH:mm:ss, horário do Brasil) e, se ele reclamar desse campo, só a data. Pedido recusado não grava nada.
+ */
+export function formatosDataInclusao(agora: { data: string; minutos: number }): string[] {
+  const hh = String(Math.floor(agora.minutos / 60)).padStart(2, "0");
+  const mm = String(agora.minutos % 60).padStart(2, "0");
+  return [`${agora.data}T${hh}:${mm}:00`, agora.data];
+}
 export const paramsApagarAfastamento = (cpf: string, inicio: string, fim: string) => ({ dataInicio: inicio, dataFim: fim, funcionarioCpf: cpf });
 
 // ---------------------------------------------------------------- afastamentos já existentes
