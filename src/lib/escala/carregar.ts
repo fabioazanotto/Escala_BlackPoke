@@ -15,7 +15,11 @@ export const ROTULO_STATUS: Record<string, string> = {
   publicada_com_alteracoes: "Publicada com alterações",
 };
 
+/** Colaborador que saiu da unidade por transferência mas ainda tem dias escalados neste mês (só para consulta). */
+export type Transferido = { id: string; nome: string; etiqueta: string; celulas: Record<string, Situacao> };
+
 export type Dados = {
+  transferidos: Transferido[];
   entrada: EntradaMotor;
   nomes: Map<string, string>;
   funcoes: Map<string, Funcao>;
@@ -50,6 +54,29 @@ export async function carregarDados(unidadeId: string, ano: number, mes: number)
   ]);
   const erro2 = extras.error ?? aus.error ?? fer.error ?? dd.error;
   if (erro2) throw erro2;
+
+  // Quem foi transferido para outra unidade e ainda tem dias escalados aqui neste mês continua visível, só para consulta.
+  const idsAtivos = new Set(ids);
+  const idsFora = [...new Set((dd.data ?? []).map((r) => String(r.colaborador_id)))].filter((id) => !idsAtivos.has(id));
+  const transferidos: Transferido[] = [];
+  if (idsFora.length > 0) {
+    const [tr, nm, un] = await Promise.all([
+      db.from("transferencias_colaboradores").select("colaborador_id, unidade_destino_id, data_inicio, criado_em").eq("unidade_origem_id", unidadeId).in("colaborador_id", idsFora).order("criado_em", { ascending: false }),
+      db.from("colaboradores").select("id, nome").in("id", idsFora),
+      db.from("unidades").select("id, nome"),
+    ]);
+    if (!tr.error && !nm.error && !un.error) {
+      for (const id of idsFora) {
+        const t = (tr.data ?? []).find((x) => x.colaborador_id === id);
+        if (!t) continue; // saiu por outro motivo (inativado etc.): continua fora da tela, como antes
+        const celulas: Record<string, Situacao> = {};
+        for (const r of dd.data ?? []) if (r.colaborador_id === id) celulas[r.data] = r.situacao as Situacao;
+        const dataBR = String(t.data_inicio).split("-").reverse().slice(0, 2).join("/");
+        transferidos.push({ id, nome: (nm.data ?? []).find((x) => x.id === id)?.nome ?? "?", etiqueta: `transferido em ${dataBR} para ${(un.data ?? []).find((x) => x.id === t.unidade_destino_id)?.nome ?? "outra unidade"}`, celulas });
+      }
+      transferidos.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    }
+  }
 
   const parametro = (chave: string): string | null => (p.data ?? []).find((x) => x.chave === chave)?.valor ?? null;
   const diasFolga = (parametro("dias_folga_semanal") ?? "1,2,3").split(",").map((x) => Number(x.trim())).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
@@ -89,6 +116,7 @@ export async function carregarDados(unidadeId: string, ano: number, mes: number)
     regras: (rg.data ?? []).map((x: { tipo: string; parametros: unknown }) => regraDoBanco(x.tipo, x.parametros)).filter((x): x is RegraMotor => x !== null),
   };
   return {
+    transferidos,
     entrada,
     nomes: new Map(entrada.colaboradores.map((x) => [x.id, x.nome])),
     funcoes: new Map((f.data as Funcao[]).map((x) => [x.id, x])),

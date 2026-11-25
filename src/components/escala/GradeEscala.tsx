@@ -4,6 +4,7 @@ import { Icone } from "@/components/Icones";
 import { DIAS_SEMANA_CURTO, paraData } from "@/lib/datas";
 import { ROTULO_TURNO } from "@/lib/funcoes";
 import type { ColaboradorMotor, ResultadoMotor, Situacao } from "@/lib/escala/tipos";
+import type { Transferido } from "@/lib/escala/carregar";
 import { CELULA } from "./rotulos";
 
 export function GradeEscala({
@@ -15,6 +16,7 @@ export function GradeEscala({
   diaSelecionado,
   aoClicarCelula,
   aoClicarDia,
+  transferidos = [],
 }: {
   dias: string[];
   colaboradores: ColaboradorMotor[];
@@ -24,6 +26,7 @@ export function GradeEscala({
   diaSelecionado: string | null;
   aoClicarCelula: (colaboradorId: string, data: string) => void;
   aoClicarDia: (data: string) => void;
+  transferidos?: Transferido[];
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white">
@@ -87,6 +90,29 @@ export function GradeEscala({
               )),
             ];
           })}
+          {transferidos.length > 0 && [
+            <tr key="t-transferidos">
+              <td colSpan={dias.length + 1} className="bg-neutral-100 p-2 font-semibold">
+                Transferidos (só consulta)
+              </td>
+            </tr>,
+            ...transferidos.map((t) => (
+              <tr key={t.id}>
+                <td className="sticky left-0 z-[1] whitespace-nowrap border-b bg-white p-2">
+                  {t.nome}
+                  <div className="text-neutral-500">{t.etiqueta}</div>
+                </td>
+                {dias.map((d) => {
+                  const s = t.celulas[d];
+                  return (
+                    <td key={d} className={`border-b border-l p-0 ${s ? CELULA[s].classe : "bg-neutral-50"}`}>
+                      <div className="flex h-9 w-full min-w-7 items-center justify-center opacity-70">{s ? CELULA[s].letra : ""}</div>
+                    </td>
+                  );
+                })}
+              </tr>
+            )),
+          ]}
         </tbody>
       </table>
     </div>

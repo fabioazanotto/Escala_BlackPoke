@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSessao } from "@/components/Sessao";
+import { TransferirColaborador } from "@/components/TransferirColaborador";
 import { ehRH } from "@/lib/acesso";
 import { ROTULO_TURNO, rotuloFuncao } from "@/lib/funcoes";
 import { semAcento } from "@/lib/importacao/colaboradores";
@@ -45,6 +46,7 @@ export default function Colaboradores() {
   const [busca, setBusca] = useState("");
   const [filtroTurno, setFiltroTurno] = useState<Turno2 | "">("");
   const [mostrarInativos, setMostrarInativos] = useState(false);
+  const [transferindo, setTransferindo] = useState<Colaborador | null>(null);
 
   useEffect(() => {
     supabase()
@@ -354,6 +356,7 @@ export default function Colaboradores() {
               {podeEditar && (
                 <div className="mt-3 flex gap-2">
                   <button className="botao-secundario flex-1" onClick={() => abrirEdicao(c)}>Editar</button>
+                  {c.ativo && unidades.length > 1 && <button className="botao-secundario flex-1" onClick={() => setTransferindo(c)}>Transferir</button>}
                   <button className="botao-secundario flex-1" onClick={() => mudarAtivo(c)}>
                     {c.ativo ? "Inativar" : "Reativar"}
                   </button>
@@ -363,6 +366,8 @@ export default function Colaboradores() {
           );
         })}
       </ul>
+
+      {transferindo && <TransferirColaborador colaborador={transferindo} unidades={unidades} onFechar={() => setTransferindo(null)} onConcluido={() => void carregar()} />}
     </div>
   );
 }

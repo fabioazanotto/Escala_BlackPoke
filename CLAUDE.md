@@ -57,6 +57,10 @@ sem formação técnica, com ajuda da IA. Leia este arquivo antes de qualquer ta
 - Motor de escalas (funções puras, com testes: `npm test`) em `src/lib/escala/`. A tela da escala (`src/app/escala-mensal`)
   tem visão em grade e em calendário, com edição direta; componentes em `src/components/escala/`.
   Alterações manuais ficam travadas e são registradas em `escala_alteracoes` (SQL em `supabase/escala/`).
+  A edição manual na grade e no calendário vale em QUALQUER estado da escala, inclusive depois de publicada (a primeira alteração muda o estado para "Publicada com alterações"); só gerar de novo é bloqueado depois de publicada.
+  Transferência de colaborador entre unidades (`Colaboradores > Transferir`, só RH/admin; `src/components/TransferirColaborador.tsx`, `src/lib/transferencia.ts`; SQL `supabase/escala/19_transferencias.sql`, função `transferir_colaborador` e tabela `transferencias_colaboradores`):
+  muda unidade, função e turno, remove funções adicionais (são por unidade), registra histórico e AVISA (sem mexer) dias ainda escalados na unidade antiga, regras da unidade que citam a pessoa e matrícula repetida.
+  Na escala da unidade antiga o transferido continua visível no mês, só para consulta, com a etiqueta "transferido em dd/mm para X". A mudança de empresa no Secullum (mesmo cadastro) é a etapa seguinte (Parte 2): hoje a caixa fica desligada.
   Regras por unidade (folga fixa, alternância, dobra, dia sem funcionamento) ficam em `regras_unidade`, são criadas só pelo RH em
   `/regras-da-unidade` e aplicadas pelo motor (`src/lib/escala/regras.ts`). Dobra é exceção ao turno fixo e aparece como "Dobra" na escala.
 - Usuários (Configurações > Usuários, só admin; `/usuarios`): `src/lib/usuarios.ts` (regras, testadas), `src/lib/servidor/usuarios.ts` e rota `/api/usuarios` (chave de serviço). O admin cria usuário com senha temporária,

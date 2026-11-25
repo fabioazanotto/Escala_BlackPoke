@@ -87,8 +87,10 @@ export default function EscalaMensal() {
   const travados = useMemo(() => new Set(resultado?.travados ?? []), [resultado]);
   const dias = useMemo(() => (mesValido ? diasDoMes(ano, mes) : []), [ano, mes, mesValido]);
 
-  const podeEditar = !!dados?.escala && ["rascunho", "em_revisao"].includes(dados.escala.status);
-  const bloqueada = !!dados?.escala && !podeEditar;
+  // Ajuste manual vale em qualquer estado, inclusive depois de publicada (fica registrado no histórico). Gerar de novo só antes de publicar.
+  const podeEditar = !!dados?.escala;
+  const publicada = !!dados?.escala && ["publicada", "publicada_com_alteracoes"].includes(dados.escala.status);
+  const bloqueada = publicada;
 
   const funcaoNome = useCallback(
     (id: string) => {
@@ -102,6 +104,7 @@ export default function EscalaMensal() {
     () => (dados?.entrada.colaboradores ?? []).filter((c) => c.nome.toLowerCase().includes(busca.toLowerCase())),
     [dados, busca],
   );
+  const transferidosFiltrados = useMemo(() => (dados?.transferidos ?? []).filter((t) => t.nome.toLowerCase().includes(busca.toLowerCase())), [dados, busca]);
   const filtroIds = useMemo(() => (busca.trim() ? new Set(colaboradoresFiltrados.map((c) => c.id)) : null), [busca, colaboradoresFiltrados]);
 
   const diasComProblema = useMemo(
@@ -157,6 +160,12 @@ export default function EscalaMensal() {
     );
     if (e1) throw e1;
 
+    // Primeira alteração depois de publicada: a escala passa a "Publicada com alterações".
+    if (dados.escala.status === "publicada") {
+      const { error: e3 } = await db.from("escalas_mensais").update({ status: "publicada_com_alteracoes" }).eq("id", escalaId);
+      if (!e3) setDados({ ...dados, escala: { ...dados.escala, status: "publicada_com_alteracoes" } });
+    }
+
     const { error: e2 } = await db.from("escala_alteracoes").insert({
       escala_id: escalaId,
       colaborador_id: colaboradorId,
@@ -207,7 +216,7 @@ export default function EscalaMensal() {
             <p>
               <strong>{dados.entrada.colaboradores.length}</strong> colaboradores ativos.{" "}
               {dados.escala ? <>Estado: <strong>{ROTULO_STATUS[dados.escala.status]}</strong>.</> : "Ainda não há escala para este mês."}
-              {bloqueada && <span className="text-amber-800"> Já publicada: não pode ser gerada de novo nem editada por aqui.</span>}
+              {bloqueada && <span className="text-amber-800"> Já publicada: não pode ser gerada de novo, mas você pode ajustar dias na grade ou no calendário; cada alteração fica no histórico.</span>}
             </p>
             {!bloqueada && (
               <button className="botao" onClick={gerar} disabled={gerando || dados.entrada.colaboradores.length === 0}>
@@ -329,6 +338,7 @@ export default function EscalaMensal() {
                     diaSelecionado={diaAberto}
                     aoClicarCelula={(colaboradorId, data) => setEdicao({ colaboradorId, data })}
                     aoClicarDia={setDiaAberto}
+                    transferidos={transferidosFiltrados}
                   />
                 ) : (
                   <CalendarioEscala dias={dias} resultado={resultado} nomes={dados.nomes} filtro={filtroIds} diaSelecionado={diaAberto} aoClicarDia={setDiaAberto} />
@@ -346,6 +356,7 @@ export default function EscalaMensal() {
                   podeEditar={podeEditar}
                   aoEditar={(colaboradorId) => setEdicao({ colaboradorId, data: diaAberto })}
                   aoFechar={() => setDiaAberto(null)}
+                  transferidos={dados.transferidos}
                 />
               )}
               {edicao && (
