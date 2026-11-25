@@ -170,3 +170,62 @@ export function analisarVisibilidade(empresasDoProjeto: { empresaId: number; nom
     testeVisivel: funcs.some((f) => semAcento(texto(valorDoCampo(f, "Nome"))).split(/\s+/)[0] === palavraTeste),
   };
 }
+
+// ---------------------------------------------------------------- batida manual
+
+export const COLUNAS_BATIDA = Array.from({ length: 5 }, (_, i) => [`Entrada${i + 1}`, `Saida${i + 1}`]).flat();
+export const rotuloColuna = (c: string) => c.replace(/^Entrada(\d)$/, "Entrada $1").replace(/^Saida(\d)$/, "Saída $1");
+
+export const MOTIVOS_BATIDA = ["Esqueceu de bater", "Erro no relógio", "Outro"] as const;
+
+/** Motivo enviado ao Secullum (obrigatório, até 150 caracteres): a opção escolhida mais o texto livre. "Outro" exige o texto. */
+export function montarMotivo(escolha: string, livre: string): { motivo: string } | { erro: string } {
+  const texto = livre.trim();
+  if (!(MOTIVOS_BATIDA as readonly string[]).includes(escolha)) return { erro: "Escolha o motivo." };
+  if (escolha === "Outro" && !texto) return { erro: "Escreva o motivo." };
+  return { motivo: (escolha === "Outro" ? texto : texto ? `${escolha}: ${texto}` : escolha).slice(0, 150) };
+}
+
+export const horaValida = (h: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(h);
+
+export type TipoDaColuna = "vazia" | "original" | "manual" | "pre_assinalada" | "justificativa";
+export type ColunaDoDia = { coluna: string; tipo: TipoDaColuna; valor: string };
+
+/** As 10 colunas do cartão do dia: o que há em cada uma e de que tipo (batida original, manual, pré-assinalada ou justificativa). */
+export function colunasDoDia(linha: unknown): ColunaDoDia[] {
+  return COLUNAS_BATIDA.map((coluna) => {
+    const valor = texto(valorDoCampo(linha, coluna));
+    if (!valor) return { coluna, tipo: "vazia" as const, valor: "" };
+    if (!HORA.test(valor)) return { coluna, tipo: "justificativa" as const, valor };
+    const t = Number(valorDoCampo(valorDoCampo(linha, `FonteDados${coluna}`), "Tipo"));
+    return { coluna, tipo: t === 1 ? ("manual" as const) : t === 2 ? ("pre_assinalada" as const) : ("original" as const), valor: valor.slice(0, 5) };
+  });
+}
+
+const minutosDoDia = (h: string) => {
+  const [hh, mm] = h.split(":").map(Number);
+  const m = hh * 60 + mm;
+  return hh < 5 ? m + 1440 : m; // o dia de trabalho só vira às 05:00: 00:20 é depois de 23:00
+};
+
+export type PlanoBatidaManual = { acao: "incluir" | "editar" | "substituir"; avisos: string[] };
+
+/** Decide o que acontece ao colocar `hora` na `coluna`; ou devolve o erro (coluna com batida original, hora inválida). */
+export function planoBatidaManual(colunas: ColunaDoDia[], coluna: string, hora: string): PlanoBatidaManual | { erro: string } {
+  if (!COLUNAS_BATIDA.includes(coluna)) return { erro: "Escolha a coluna." };
+  if (!horaValida(hora)) return { erro: "Informe a hora no formato HH:mm." };
+  const alvo = colunas.find((c) => c.coluna === coluna)!;
+  if (alvo.tipo === "original") return { erro: `A coluna ${rotuloColuna(coluna)} já tem uma batida original (${alvo.valor}). O Secullum não deixa trocar batida original; apague a batida errada primeiro.` };
+  const avisos: string[] = [];
+  const i = COLUNAS_BATIDA.indexOf(coluna);
+  const m = minutosDoDia(hora);
+  const antes = [...colunas.slice(0, i)].reverse().find((c) => c.tipo !== "vazia" && c.tipo !== "justificativa");
+  const depois = colunas.slice(i + 1).find((c) => c.tipo !== "vazia" && c.tipo !== "justificativa");
+  if (antes && minutosDoDia(antes.valor) > m) avisos.push(`Fora de ordem: ${rotuloColuna(antes.coluna)} é ${antes.valor}, depois de ${hora}.`);
+  if (depois && minutosDoDia(depois.valor) < m) avisos.push(`Fora de ordem: ${rotuloColuna(depois.coluna)} é ${depois.valor}, antes de ${hora}.`);
+  for (const v of [antes, depois]) if (v && Math.abs(minutosDoDia(v.valor) - m) <= 10) avisos.push(`${hora} fica a ${Math.abs(minutosDoDia(v.valor) - m)} min de ${rotuloColuna(v.coluna)} (${v.valor}): pode ser batida duplicada.`);
+  if (alvo.tipo === "justificativa") avisos.push(`A coluna tem a justificativa ${alvo.valor}: o Secullum apaga a justificativa e a coluna par dela ao incluir a batida.`);
+  return { acao: alvo.tipo === "manual" ? "editar" : alvo.tipo === "justificativa" ? "substituir" : "incluir", avisos };
+}
+
+export const corpoBatidaManual = (cpf: string, dia: string, coluna: string, hora: string, motivo: string) => ({ Cpf: cpf, Data: dia, Coluna: coluna, Hora: hora, Motivo: motivo });

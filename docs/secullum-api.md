@@ -138,3 +138,7 @@ Mesmo servidor da leitura (`.../IntegracaoExterna/`). Identificador do funcioná
 - **`POST FuncionariosAfastamentos`:** exige `DataInclusao` (não está na tabela do manual): "DataInclusao: Preencha o campo DataInclusao corretamente". O app manda `AAAA-MM-DDTHH:mm:ss` (hora do Brasil) e, se o Secullum reclamar do campo, só a data. O afastamento preenche as colunas do cartão com a justificativa em todos os dias do período, inclusive futuros.
 - **`GET FuncionariosAfastamentos?funcionarioCpf=` NÃO filtra por CPF** de forma confiável: devolveu afastamentos de outras pessoas. Sempre conferir o CPF de cada registro (campo `Cpf`) e nunca apagar por datas se outra pessoa tem as mesmas datas.
 - Formato de erro 400: `Property: Message`, `{ Message }`, `{ errors: {...} }` ou texto; o app mostra o motivo.
+
+## Escrita: batida manual (Etapa A, implementada; ainda não testada no Secullum real)
+- `POST CartaoPonto/Manual` `{ Cpf, Data, Coluna, Hora, Motivo }`. O app só envia depois de ler o cartão do dia: coluna com batida ORIGINAL é recusada antes (o Secullum também recusa); manual existente é editada; justificativa na coluna é substituída (com aviso). Tipo da batida lido de `FonteDados<Coluna>.Tipo` (0 original, 1 manual, 2 pré-assinalada).
+- Depois de gravar, o app relê o dia e confere se a hora está na coluna.

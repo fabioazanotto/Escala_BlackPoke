@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { COLUNAS_OFICIAIS, dataBR, montarCsv, observacoesDoDia } from "@/lib/ponto/csv";
 import { posicionar } from "@/lib/ponto/aoVivo";
+import { COLUNAS_BATIDA } from "@/lib/ponto/escrita";
 import { duracao, type DiaMes } from "@/lib/ponto/mes";
 import type { FuncionarioDaLista, MesDoColaborador } from "@/lib/ponto/mesTipos";
 import { ListaColaboradoresPonto } from "@/components/ponto/ListaColaboradoresPonto";
@@ -52,6 +53,18 @@ function acaoDoDia(d: DiaMes, hoje: string, admissao: string | null, demissao: s
   if (d.futuro || d.dia >= hoje || d.batidas.length > 0 || d.todasBatidas.length > 0) return null;
   if ((admissao && d.dia < admissao) || (demissao && d.dia > demissao)) return null; // fora do vínculo: o Secullum recusaria
   return d.justificativa ? "remover" : "justificar";
+}
+
+/** Incluir batida manual: dia que já começou e dentro do vínculo. */
+function podeIncluirBatida(d: DiaMes, hoje: string, admissao: string | null, demissao: string | null): boolean {
+  if (d.futuro || d.dia > hoje) return false;
+  return !((admissao && d.dia < admissao) || (demissao && d.dia > demissao));
+}
+
+/** Coluna sugerida: a primeira vaga das 4 colunas de sempre (com retorno em aberto, a vaga é a Entrada 2). */
+function colunaSugerida(d: DiaMes): string {
+  const i = posicionar(d.batidas, d.retornoEmAberto).findIndex((b) => b === null);
+  return COLUNAS_BATIDA[i === -1 ? 4 : i];
 }
 
 const somarMeses = (mes: string, n: number) => {
@@ -348,6 +361,11 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
                               {acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) === "remover" ? "Remover justificativa" : "Justificar"}
                             </button>
                           )}
+                          {creator && selecionado && podeIncluirBatida(d, hoje, vinculo.admissao, vinculo.demissao) && (
+                            <button type="button" className="mt-1 block rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50" onClick={() => setEscrita({ tipo: "batida_manual", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia, colunaSugerida: colunaSugerida(d) })}>
+                              Incluir batida
+                            </button>
+                          )}
                           {obs.map((t) => (
                             <p key={t} className={`mt-0.5 text-xs ${t.startsWith("Divergência") ? "text-amber-900" : "text-neutral-700"}`}>
                               {t}
@@ -398,6 +416,11 @@ export function MesDoColaboradorTela({ inicialFuncionario, inicialMes }: { inici
                     {creator && selecionado && acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) && (
                       <button type="button" className="mt-1.5 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800" onClick={() => setEscrita({ tipo: acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) === "remover" ? "remover_justificativa" : "justificar", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia })}>
                         {acaoDoDia(d, hoje, vinculo.admissao, vinculo.demissao) === "remover" ? "Remover justificativa" : "Justificar"}
+                      </button>
+                    )}
+                    {creator && selecionado && podeIncluirBatida(d, hoje, vinculo.admissao, vinculo.demissao) && (
+                      <button type="button" className="mt-1.5 ml-2 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-800" onClick={() => setEscrita({ tipo: "batida_manual", funcionarioId: selecionado.id, nome: selecionado.nome, dia: d.dia, colunaSugerida: colunaSugerida(d) })}>
+                        Incluir batida
                       </button>
                     )}
                     {d.batidas.length > 0 && <p className="mt-1 text-xs tabular-nums text-neutral-700">{(d.retornoEmAberto ? posicionar(d.batidas, true) : d.batidas).map((b) => (b ? b.hora + (b.manual ? " (manual)" : "") : "—")).join(" · ")} {d.trabalhadoMin > 0 && `· ${duracao(d.trabalhadoMin)}`}</p>}

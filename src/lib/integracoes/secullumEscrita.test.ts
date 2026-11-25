@@ -16,14 +16,15 @@ function falso(respostas: { status: number; corpo?: unknown }[]) {
 }
 
 describe("lista de operações de escrita", () => {
-  it("libera só as 4 operações desta etapa", () => {
+  it("libera só as 5 operações desta etapa", () => {
+    expect(rotaDeEscritaPermitida("POST", "CartaoPonto/Manual")).toBe(true);
     expect(rotaDeEscritaPermitida("POST", "CartaoPonto/Justificativa")).toBe(true);
     expect(rotaDeEscritaPermitida("DELETE", "/CartaoPonto/")).toBe(true);
     expect(rotaDeEscritaPermitida("POST", "FuncionariosAfastamentos")).toBe(true);
     expect(rotaDeEscritaPermitida("DELETE", "FuncionariosAfastamentos/Cpf")).toBe(true);
   });
   it("recusa tudo o mais: apagar/alterar funcionário, batida manual, troca, horários, empresas, leitura", () => {
-    for (const [m, c] of [["DELETE", "Funcionarios"], ["DELETE", "Funcionarios/Cpf"], ["POST", "Funcionarios"], ["POST", "CartaoPonto/Manual"], ["POST", "CartaoPonto/Troca"], ["POST", "CartaoPonto/TrocaDia"], ["POST", "Horarios"], ["DELETE", "Empresas"], ["POST", "Empresas"], ["GET", "Funcionarios"], ["POST", "CartaoPonto"]]) {
+    for (const [m, c] of [["DELETE", "Funcionarios"], ["DELETE", "Funcionarios/Cpf"], ["POST", "Funcionarios"], ["POST", "CartaoPonto/Troca"], ["POST", "CartaoPonto/TrocaDia"], ["POST", "Horarios"], ["DELETE", "Empresas"], ["POST", "Empresas"], ["GET", "Funcionarios"], ["POST", "CartaoPonto"]]) {
       expect(rotaDeEscritaPermitida(m, c), `${m} ${c}`).toBe(false);
     }
   });

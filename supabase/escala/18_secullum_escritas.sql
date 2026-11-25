@@ -11,7 +11,7 @@ create table if not exists secullum_escritas (
   lancado_por_nome text,
   funcionario_ponto_id int not null,                 -- código no Secullum
   nome_registrado text not null,
-  acao text not null check (acao in ('justificar', 'remover_justificativa', 'afastamento', 'remover_afastamento')),
+  acao text not null,
   dia_inicio date not null,
   dia_fim date,
   detalhe jsonb not null default '{}'::jsonb,        -- justificativa, grupos, motivo... (sem dados pessoais)
@@ -27,3 +27,8 @@ drop policy if exists "admin le" on secullum_escritas;
 drop policy if exists "admin acrescenta" on secullum_escritas;
 create policy "admin le" on secullum_escritas for select to authenticated using (eh_admin());
 create policy "admin acrescenta" on secullum_escritas for insert to authenticated with check (eh_admin());
+
+-- Ações aceitas (regra recriada para poder ampliar a lista sem apagar nada; pode rodar de novo).
+alter table secullum_escritas drop constraint if exists secullum_escritas_acao_check;
+alter table secullum_escritas add constraint secullum_escritas_acao_check
+  check (acao in ('justificar', 'remover_justificativa', 'afastamento', 'remover_afastamento', 'batida_manual', 'corrigir_duplicada', 'desligar'));

@@ -9,6 +9,7 @@ const estado = vi.hoisted(() => ({
   dataInclusaoSoData: false, // simula o Secullum que só aceita DataInclusao sem hora
   justificativasNoDia: [] as { grupo: number; texto: string }[], // o que o "Secullum" tem no dia
   batidasNoDia: [] as string[],
+  manuaisNoDia: [] as { coluna: string; hora: string }[],
   afastamentos: [] as { Cpf?: string; Inicio: string; Fim: string; JustificativaNome: string; Motivo: string }[],
   nomeFuncionario: "Teste",
   admissao: "2020-01-01T00:00:00" as string | null,
@@ -24,6 +25,7 @@ vi.mock("@/lib/integracoes/secullumEscrita", () => ({
       estado.escritas.push({ metodo, caminho, ...opcoes });
       if (estado.falharNaEscrita !== null && estado.escritas.length === estado.falharNaEscrita) throw new Error("O Secullum não aceitou o pedido: Grupo: erro simulado");
       if (caminho === "FuncionariosAfastamentos" && estado.dataInclusaoSoData && String(opcoes.corpo!.DataInclusao).includes("T")) throw new Error("O Secullum não aceitou o pedido: DataInclusao: Preencha o campo DataInclusao corretamente.");
+      if (caminho === "CartaoPonto/Manual") estado.manuaisNoDia = [...estado.manuaisNoDia.filter((m) => m.coluna !== opcoes.corpo!.Coluna), { coluna: String(opcoes.corpo!.Coluna), hora: String(opcoes.corpo!.Hora) }];
       if (caminho === "CartaoPonto/Justificativa") estado.justificativasNoDia.push({ grupo: Number(opcoes.corpo!.Grupo), texto: String(opcoes.corpo!.Justificativa) });
       if (metodo === "DELETE" && caminho === "CartaoPonto") estado.justificativasNoDia = estado.justificativasNoDia.filter((j) => `Entrada${j.grupo}` !== opcoes.corpo!.Coluna && `Saida${j.grupo}` !== opcoes.corpo!.Coluna);
       if (caminho === "FuncionariosAfastamentos") estado.afastamentos.push({ Cpf: "111.222.333-96", Inicio: String(opcoes.corpo!.Inicio), Fim: String(opcoes.corpo!.Fim), JustificativaNome: String(opcoes.corpo!.JustificativaNome), Motivo: String(opcoes.corpo!.Motivo ?? "") });
@@ -44,7 +46,15 @@ vi.mock("./pontoDados", async (importar) => {
         case "Justificativas": return [{ NomeAbreviado: "ATEST", NomeCompleto: "Atestado" }];
         case "Batidas": {
           const linha: Record<string, unknown> = { FuncionarioId: 7, Data: "x" };
-          estado.batidasNoDia.forEach((h, i) => (linha[i % 2 === 0 ? `Entrada${Math.floor(i / 2) + 1}` : `Saida${Math.floor(i / 2) + 1}`] = h));
+          estado.batidasNoDia.forEach((h, i) => {
+            const col = i % 2 === 0 ? `Entrada${Math.floor(i / 2) + 1}` : `Saida${Math.floor(i / 2) + 1}`;
+            linha[col] = h;
+            linha[`FonteDados${col}`] = { Tipo: 0 };
+          });
+          for (const m of estado.manuaisNoDia) {
+            linha[m.coluna] = m.hora;
+            linha[`FonteDados${m.coluna}`] = { Tipo: 1 };
+          }
           for (const j of estado.justificativasNoDia) linha[`Entrada${j.grupo}`] = j.texto;
           return [new Proxy(linha, {})].map((l) => ({ ...l, Data: (globalThis as { __dia?: string }).__dia }));
         }
@@ -79,6 +89,7 @@ beforeEach(() => {
   estado.dataInclusaoSoData = false;
   estado.justificativasNoDia = [];
   estado.batidasNoDia = [];
+  estado.manuaisNoDia = [];
   estado.afastamentos = [];
   estado.nomeFuncionario = "Teste";
   estado.admissao = "2020-01-01T00:00:00";
@@ -208,5 +219,39 @@ describe("DataInclusao do afastamento", () => {
     expect(estado.escritas).toHaveLength(2);
     expect(String(estado.escritas[1].corpo!.DataInclusao)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(r.resultado?.ok).toBe(true);
+  });
+});
+
+describe("batida manual", () => {
+  const base = { acao: "batida_manual" as const, funcionario: 7, dia: passado, coluna: "Entrada2", hora: "16:05", motivo: "Esqueceu de bater" };
+  it("sem confirmar só mostra a prévia, com o que há hoje no cartão", async () => {
+    estado.batidasNoDia = ["09:58", "17:11"];
+    const r = await processarEscrita(dbFalso(), quem, base);
+    expect(r.previa?.linhas.join("\n")).toContain("Entrada 2 · hora 16:05");
+    expect(r.previa?.linhas.join("\n")).toContain("Entrada 1 09:58 · Saída 1 17:11");
+    expect(estado.escritas).toHaveLength(0);
+    expect(estado.auditoria).toHaveLength(0);
+  });
+  it("confirmado: POST na rota certa, conferência e auditoria", async () => {
+    estado.batidasNoDia = ["09:58", "17:11"];
+    const r = await processarEscrita(dbFalso(), quem, { ...base, confirmar: true });
+    expect(estado.escritas).toHaveLength(1);
+    expect(estado.escritas[0]).toMatchObject({ metodo: "POST", caminho: "CartaoPonto/Manual", corpo: { Cpf: "111.222.333-96", Data: passado, Coluna: "Entrada2", Hora: "16:05", Motivo: "Esqueceu de bater" } });
+    expect(r.resultado?.mensagem).toContain("conferida");
+    expect(estado.auditoria[0]).toMatchObject({ acao: "batida_manual", status: "ok" });
+    expect(JSON.stringify(estado.auditoria)).not.toContain("111.222");
+  });
+  it("recusa coluna com batida original, dia futuro, motivo ausente e hora inválida, sem escrever", async () => {
+    estado.batidasNoDia = ["09:58"];
+    await expect(processarEscrita(dbFalso(), quem, { ...base, coluna: "Entrada1", confirmar: true })).rejects.toThrow(/batida original/);
+    await expect(processarEscrita(dbFalso(), quem, { ...base, dia: somarDiasData(hoje, 1), confirmar: true })).rejects.toThrow(/já começou/);
+    await expect(processarEscrita(dbFalso(), quem, { ...base, motivo: "Outro", confirmar: true })).rejects.toThrow(/Escreva o motivo/);
+    await expect(processarEscrita(dbFalso(), quem, { ...base, hora: "7h", confirmar: true })).rejects.toThrow(/HH:mm/);
+    expect(estado.escritas).toHaveLength(0);
+  });
+  it("recusa dia antes da admissão", async () => {
+    estado.admissao = `${somarDiasData(hoje, -1)}T00:00:00`;
+    await expect(processarEscrita(dbFalso(), quem, { ...base, confirmar: true })).rejects.toThrow(/antes da admissão/);
+    expect(estado.escritas).toHaveLength(0);
   });
 });

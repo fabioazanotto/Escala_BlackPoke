@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analisarVisibilidade, corpoAfastamento, formatosDataInclusao, corpoApagarColuna, corpoJustificar, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas, paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarPeriodo, validarVinculo } from "./escrita";
+import { colunasDoDia, horaValida, montarMotivo, planoBatidaManual, rotuloColuna, analisarVisibilidade, corpoAfastamento, formatosDataInclusao, corpoApagarColuna, corpoJustificar, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas, paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarPeriodo, validarVinculo } from "./escrita";
 
 describe("liberadoParaEscrita (modo teste)", () => {
   it("só libera nome que começa com Teste", () => {
@@ -99,5 +99,50 @@ describe("formatosDataInclusao", () => {
   it("tenta data e hora e depois só a data", () => {
     expect(formatosDataInclusao({ data: "2026-11-17", minutos: 14 * 60 + 5 })).toEqual(["2026-11-17T14:05:00", "2026-11-17"]);
     expect(formatosDataInclusao({ data: "2026-11-17", minutos: 9 })).toEqual(["2026-11-17T00:09:00", "2026-11-17"]);
+  });
+});
+
+describe("batida manual", () => {
+  it("rótulos, hora e motivo", () => {
+    expect(rotuloColuna("Entrada2")).toBe("Entrada 2");
+    expect(rotuloColuna("Saida1")).toBe("Saída 1");
+    expect(horaValida("16:05")).toBe(true);
+    expect(horaValida("24:00")).toBe(false);
+    expect(horaValida("9:5")).toBe(false);
+    expect(montarMotivo("Esqueceu de bater", "")).toEqual({ motivo: "Esqueceu de bater" });
+    expect(montarMotivo("Erro no relógio", "ponto virtual fora do ar")).toEqual({ motivo: "Erro no relógio: ponto virtual fora do ar" });
+    expect(montarMotivo("Outro", "  Saiu mais cedo  ")).toEqual({ motivo: "Saiu mais cedo" });
+    expect(montarMotivo("Outro", "")).toEqual({ erro: "Escreva o motivo." });
+    expect(montarMotivo("", "x")).toEqual({ erro: "Escolha o motivo." });
+    expect("motivo" in montarMotivo("Outro", "x".repeat(300)) && (montarMotivo("Outro", "x".repeat(300)) as { motivo: string }).motivo.length).toBe(150);
+  });
+
+  const linha = { Entrada1: "09:58", Saida1: "17:11", Entrada2: "ATEST", FonteDadosEntrada1: { Tipo: 0 }, FonteDadosSaida1: { Tipo: 1 } };
+  it("lê as colunas e o tipo de cada uma", () => {
+    const c = colunasDoDia(linha);
+    expect(c).toHaveLength(10);
+    expect(c.slice(0, 4).map((x) => [x.tipo, x.valor])).toEqual([["original", "09:58"], ["manual", "17:11"], ["justificativa", "ATEST"], ["vazia", ""]]);
+  });
+  it("coluna com batida original é recusada; vazia inclui; manual edita; justificativa substitui (com aviso)", () => {
+    const c = colunasDoDia(linha);
+    expect(planoBatidaManual(c, "Entrada1", "10:00")).toMatchObject({ erro: expect.stringContaining("batida original") });
+    expect(planoBatidaManual(c, "Saida2", "19:08")).toMatchObject({ acao: "incluir" });
+    expect(planoBatidaManual(c, "Saida1", "17:20")).toMatchObject({ acao: "editar" });
+    const sub = planoBatidaManual(c, "Entrada2", "18:30");
+    expect(sub).toMatchObject({ acao: "substituir" });
+    expect((sub as { avisos: string[] }).avisos.join()).toContain("justificativa ATEST");
+  });
+  it("avisa ordem trocada e possível duplicada; trata madrugada como depois da noite", () => {
+    const c = colunasDoDia({ Entrada1: "16:00", Saida1: "17:30", FonteDadosEntrada1: { Tipo: 0 }, FonteDadosSaida1: { Tipo: 0 } });
+    const antes = planoBatidaManual(c, "Entrada2", "17:00") as { avisos: string[] };
+    expect(antes.avisos.join()).toContain("Fora de ordem");
+    const perto = planoBatidaManual(c, "Entrada2", "17:35") as { avisos: string[] };
+    expect(perto.avisos.join()).toContain("duplicada");
+    const madrugada = colunasDoDia({ Entrada1: "16:00", Saida1: "17:30", Entrada2: "18:30", FonteDadosEntrada1: { Tipo: 0 }, FonteDadosSaida1: { Tipo: 0 }, FonteDadosEntrada2: { Tipo: 0 } });
+    expect((planoBatidaManual(madrugada, "Saida2", "00:20") as { avisos: string[] }).avisos).toEqual([]);
+  });
+  it("coluna e hora inválidas", () => {
+    expect(planoBatidaManual(colunasDoDia({}), "Xpto", "10:00")).toEqual({ erro: "Escolha a coluna." });
+    expect(planoBatidaManual(colunasDoDia({}), "Entrada1", "25:00")).toEqual({ erro: "Informe a hora no formato HH:mm." });
   });
 });

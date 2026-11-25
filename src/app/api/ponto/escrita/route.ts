@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 const semCache = { "Cache-Control": "no-store" };
 
-const ACOES = ["opcoes", "diagnostico_escrita", "listar_afastamentos", "justificar", "remover_justificativa", "afastamento", "remover_afastamento"];
+const ACOES = ["opcoes", "diagnostico_escrita", "batida_manual", "listar_afastamentos", "justificar", "remover_justificativa", "afastamento", "remover_afastamento"];
 
 /**
  * ESCRITA no Secullum (justificar falta e afastamentos). Só o creator. No modo teste só vale para o funcionário de teste.

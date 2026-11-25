@@ -8,7 +8,7 @@ import { ErroSecullum, SessaoSecullum, URL_AUTENTICADOR, obterToken, valorDoCamp
 import { SessaoSecullumEscrita, credenciaisDeEscrita } from "@/lib/integracoes/secullumEscrita";
 import { agoraNoBrasil, diaDeTrabalho } from "@/lib/ponto/aoVivo";
 import {
-  afastamentosDeOutrosComAsMesmasDatas, analisarVisibilidade, corpoAfastamento, corpoApagarColuna, corpoJustificar, formatosDataInclusao, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
+  afastamentosDeOutrosComAsMesmasDatas, analisarVisibilidade, corpoAfastamento, colunasDoDia, corpoApagarColuna, corpoBatidaManual, corpoJustificar, formatosDataInclusao, montarMotivo, planoBatidaManual, rotuloColuna, diaSemanaSecullum, estadoDoDia, gruposDoHorarioDoDia, lerAfastamentos, liberadoParaEscrita, listarJustificativas,
   paramsApagarAfastamento, periodosSeSobrepoem, validarDiaDaFalta, validarData, validarPeriodo, validarVinculo, type AfastamentoLido, type Justificativa,
 } from "@/lib/ponto/escrita";
 import { somarDiasData } from "@/lib/vendas/datas";
@@ -21,6 +21,7 @@ export type Pedido =
   | { acao: "opcoes" }
   | { acao: "diagnostico_escrita" }
   | { acao: "listar_afastamentos"; funcionario: number }
+  | { acao: "batida_manual"; funcionario: number; dia: string; coluna: string; hora: string; motivo: string; motivoLivre?: string; confirmar?: boolean }
   | { acao: "justificar"; funcionario: number; dia: string; justificativa: string; confirmar?: boolean }
   | { acao: "remover_justificativa"; funcionario: number; dia: string; confirmar?: boolean }
   | { acao: "afastamento"; funcionario: number; inicio: string; fim: string; justificativa: string; motivo?: string; confirmar?: boolean }
@@ -64,10 +65,13 @@ async function preparar(db: SupabaseClient, funcionarioId: number) {
 }
 type Preparado = Awaited<ReturnType<typeof preparar>>;
 
-async function lerDia(p: Preparado, dia: string) {
+async function lerLinhaDoDia(p: Preparado, dia: string) {
   const r = await p.contexto.sessao.obter("Batidas", { dataInicio: dia, dataFim: dia, funcionarioCpf: p.cpf });
-  const linha = lista(r).find((l) => Number(valorDoCampo(l, "FuncionarioId")) === p.f.id && texto(valorDoCampo(l, "Data")).slice(0, 10) === dia);
-  return estadoDoDia(linha);
+  return lista(r).find((l) => Number(valorDoCampo(l, "FuncionarioId")) === p.f.id && texto(valorDoCampo(l, "Data")).slice(0, 10) === dia);
+}
+
+async function lerDia(p: Preparado, dia: string) {
+  return estadoDoDia(await lerLinhaDoDia(p, dia));
 }
 
 async function lerAfastamentosBrutos(p: Preparado, de: string, ate: string) {
@@ -97,6 +101,41 @@ async function registrar(db: SupabaseClient, quem: Quem, p: Preparado, acao: str
 const mensagemDe = (e: unknown) => (e instanceof ErroSecullum || e instanceof ErroEscrita || e instanceof Error ? e.message : "Erro inesperado.");
 
 // ---------------------------------------------------------------- ações
+
+async function batidaManual(db: SupabaseClient, quem: Quem, pedido: Extract<Pedido, { acao: "batida_manual" }>): Promise<RespostaEscrita> {
+  const p = await preparar(db, pedido.funcionario);
+  const erroData = validarData(pedido.dia, p.hoje) ?? (pedido.dia > p.hoje ? "Só dá para incluir batida em um dia que já começou." : null) ?? validarVinculo(pedido.dia, p.f.admissao, p.f.demissao);
+  if (erroData) throw new ErroEscrita(erroData);
+  const m = montarMotivo(pedido.motivo, pedido.motivoLivre ?? "");
+  if ("erro" in m) throw new ErroEscrita(m.erro);
+
+  const colunas = colunasDoDia(await lerLinhaDoDia(p, pedido.dia));
+  const plano = planoBatidaManual(colunas, pedido.coluna, pedido.hora);
+  if ("erro" in plano) throw new ErroEscrita(plano.erro);
+
+  const agora = colunas.filter((c) => c.tipo !== "vazia").map((c) => `${rotuloColuna(c.coluna)} ${c.valor}${c.tipo === "manual" ? "*" : ""}`).join(" · ");
+  const verbo = plano.acao === "incluir" ? "será incluída" : plano.acao === "editar" ? "será editada (já era manual)" : "substituirá a justificativa";
+  const previa: Previa = {
+    titulo: "Incluir batida manual no Secullum",
+    linhas: [`Funcionário: ${p.f.nome}`, `Dia: ${dataBR(pedido.dia)} (${nomeDoDia(pedido.dia)})`, `Coluna: ${rotuloColuna(pedido.coluna)} · hora ${pedido.hora}`, `A batida ${verbo}, marcada como manual (*).`, `Motivo: ${m.motivo}`, `Hoje no cartão: ${agora || "sem batidas"}`],
+    avisos: plano.avisos,
+  };
+  if (!pedido.confirmar) return { modoTeste: MODO_TESTE_ESCRITA, previa };
+
+  try {
+    await p.escrita.escrever("POST", "CartaoPonto/Manual", { corpo: corpoBatidaManual(p.cpfSecullum, pedido.dia, pedido.coluna, pedido.hora, m.motivo) });
+  } catch (e) {
+    const msg = mensagemDe(e);
+    await registrar(db, quem, p, "batida_manual", pedido.dia, null, { coluna: pedido.coluna, hora: pedido.hora }, "erro", msg);
+    throw new ErroEscrita(msg);
+  }
+  const depois = await lerLinhaDoDia(p, pedido.dia).then((l) => colunasDoDia(l)).catch(() => null);
+  const conferido = depois !== null && depois.find((c) => c.coluna === pedido.coluna)?.valor === pedido.hora;
+  invalidar(p);
+  const mensagem = conferido ? "Batida incluída e conferida no Secullum." : "Gravei no Secullum, mas não consegui conferir agora. Abra o cartão no Secullum para ver.";
+  await registrar(db, quem, p, "batida_manual", pedido.dia, null, { coluna: pedido.coluna, hora: pedido.hora, motivo: m.motivo, acao: plano.acao, conferido }, "ok", mensagem);
+  return { modoTeste: MODO_TESTE_ESCRITA, resultado: { ok: true, mensagem, avisos: conferido ? [] : ["Conferência pendente."] } };
+}
 
 async function justificar(db: SupabaseClient, quem: Quem, pedido: Extract<Pedido, { acao: "justificar" }>): Promise<RespostaEscrita> {
   const p = await preparar(db, pedido.funcionario);
@@ -302,6 +341,8 @@ export async function processarEscrita(db: SupabaseClient, quem: Quem, pedido: P
       const p = await preparar(db, pedido.funcionario);
       return { modoTeste: MODO_TESTE_ESCRITA, afastamentos: await lerAfastamentosDe(p, somarDiasData(p.hoje, -365), somarDiasData(p.hoje, 365)) };
     }
+    case "batida_manual":
+      return batidaManual(db, quem, pedido);
     case "justificar":
       return justificar(db, quem, pedido);
     case "remover_justificativa":

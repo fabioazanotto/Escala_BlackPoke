@@ -13,6 +13,7 @@ export const VARIAVEL_SENHA_ESCRITA = "SECULLUM_ESCRITA_SENHA";
 export const ROTAS_ESCRITA = [
   { metodo: "POST", caminho: "CartaoPonto/Justificativa" }, // justificar um grupo de batidas do dia
   { metodo: "DELETE", caminho: "CartaoPonto" }, // apagar a justificativa (ou valor) de uma coluna
+  { metodo: "POST", caminho: "CartaoPonto/Manual" }, // incluir/editar batida manual
   { metodo: "POST", caminho: "FuncionariosAfastamentos" }, // lançar afastamento
   { metodo: "DELETE", caminho: "FuncionariosAfastamentos/Cpf" }, // apagar afastamento
 ] as const;

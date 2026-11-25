@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { enviar } from "@/components/ponto/chamar";
-import type { Justificativa } from "@/lib/ponto/escrita";
+import { COLUNAS_BATIDA, MOTIVOS_BATIDA, rotuloColuna, type Justificativa } from "@/lib/ponto/escrita";
 import type { Previa, ResultadoEscrita } from "@/lib/servidor/pontoEscrita";
 
 export type ConfigEscrita =
+  | { tipo: "batida_manual"; funcionarioId: number; nome: string; dia: string; colunaSugerida: string }
   | { tipo: "justificar"; funcionarioId: number; nome: string; dia: string }
   | { tipo: "remover_justificativa"; funcionarioId: number; nome: string; dia: string }
   | { tipo: "afastamento"; funcionarioId: number; nome: string }
@@ -15,6 +16,7 @@ type Resp = { modoTeste: boolean; justificativas?: Justificativa[]; previa?: Pre
 
 const dataBR = (d: string) => d.split("-").reverse().join("/");
 const TITULO: Record<ConfigEscrita["tipo"], string> = {
+  batida_manual: "Incluir batida manual no Secullum",
   justificar: "Justificar falta no Secullum",
   remover_justificativa: "Remover justificativa no Secullum",
   afastamento: "Lançar afastamento no Secullum",
@@ -33,6 +35,10 @@ export function PainelEscrita({ config, onFechar, onConcluido }: { config: Confi
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [modoTeste, setModoTeste] = useState(true);
+  const [coluna, setColuna] = useState(config.tipo === "batida_manual" ? config.colunaSugerida : "");
+  const [hora, setHora] = useState("");
+  const [motivoBatida, setMotivoBatida] = useState("");
+  const [motivoLivre, setMotivoLivre] = useState("");
 
   const precisaJustificativa = config.tipo === "justificar" || config.tipo === "afastamento";
 
@@ -54,6 +60,7 @@ export function PainelEscrita({ config, onFechar, onConcluido }: { config: Confi
   function corpo(confirmar: boolean) {
     const base = { funcionario: config.funcionarioId, confirmar };
     switch (config.tipo) {
+      case "batida_manual": return { acao: "batida_manual", ...base, dia: config.dia, coluna, hora, motivo: motivoBatida, motivoLivre };
       case "justificar": return { acao: "justificar", ...base, dia: config.dia, justificativa };
       case "remover_justificativa": return { acao: "remover_justificativa", ...base, dia: config.dia };
       case "afastamento": return { acao: "afastamento", ...base, inicio, fim, justificativa, motivo };
@@ -79,7 +86,7 @@ export function PainelEscrita({ config, onFechar, onConcluido }: { config: Confi
   }
 
   const formPronto =
-    config.tipo === "justificar" ? justificativa !== "" : config.tipo === "afastamento" ? justificativa !== "" && inicio !== "" && fim !== "" : true;
+    config.tipo === "batida_manual" ? coluna !== "" && hora !== "" && motivoBatida !== "" && (motivoBatida !== "Outro" || motivoLivre.trim() !== "") : config.tipo === "justificar" ? justificativa !== "" : config.tipo === "afastamento" ? justificativa !== "" && inicio !== "" && fim !== "" : true;
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="titulo-escrita" className="nao-imprimir fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
@@ -111,6 +118,42 @@ export function PainelEscrita({ config, onFechar, onConcluido }: { config: Confi
                   ))}
                 </select>
               </label>
+            )}
+            {config.tipo === "batida_manual" && (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium">Coluna do cartão</span>
+                    <select className="campo" value={coluna} onChange={(e) => setColuna(e.target.value)}>
+                      {COLUNAS_BATIDA.map((c) => (
+                        <option key={c} value={c}>
+                          {rotuloColuna(c)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium">Hora</span>
+                    <input className="campo" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+                  </label>
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">Motivo</span>
+                  <select className="campo" value={motivoBatida} onChange={(e) => setMotivoBatida(e.target.value)}>
+                    <option value="">Escolha…</option>
+                    {MOTIVOS_BATIDA.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">{motivoBatida === "Outro" ? "Escreva o motivo" : "Detalhe (opcional)"}</span>
+                  <input className="campo" maxLength={120} value={motivoLivre} onChange={(e) => setMotivoLivre(e.target.value)} />
+                </label>
+                <p className="text-xs text-neutral-600">A batida entra marcada como manual (*) e o motivo fica no log do Secullum. A coluna do cartão tem de estar vazia ou ter uma batida manual: batida original o Secullum não deixa trocar.</p>
+              </>
             )}
             {config.tipo === "afastamento" && (
               <>
